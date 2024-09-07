@@ -1,0 +1,6 @@
+---
+- name: Create new mariadb database
+  become: true
+  mysql_db:
+    state: present
+    db: "{{ database }}"

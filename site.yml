@@ -1,6 +1,18 @@
 ---
 - hosts: servers
   gather_facts: true
+  vars_prompt:
+    - name: username
+      prompt: "New mysql Username"
+      private: false
+
+    - name: password
+      prompt: "New mysql Password"
+      private: false
+
+    - name: database
+      prompt: "New mysql Database"
+      private: false
 
   tasks:
     - name: Install nginx
@@ -11,3 +23,9 @@
 
     - name: Install mariadb
       include_tasks: tasks/install-mariadb.yml
+
+    - name: Setup mariadb database
+      include_tasks: tasks/setup-mariadb-database.yml
+
+    - name: Setup mariadb user
+      include_tasks: tasks/setup-mariadb-user.yml
