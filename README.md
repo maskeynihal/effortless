@@ -1,20 +1,25 @@
 # Effortless
 
-## Server Requirement 
-- Ubunutu 20
+### Pre-requisites
+- [Install Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-and-upgrading-ansible)
+- [OpenSSH Server](https://ubuntu.com/server/docs/service-openssh)
+- [Ubuntu Server](https://ubuntu.com/download/server)
+- [SSH Setup](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent)
 
-## Prerequirement for script
-1. Access to github repo
-2. Provide github repo URL as input
-3. Access to server in which the application will be deployed
+#### 1. Inventory
+- ansible_connection
+- ansible_user
+- ansible_sudo_pass
+- ansible_ssh_private
 
-## What the script does
-1. Install php [Version should be provided as input]
-2. Install nginx
-3. Install mysql
-4. Setup users for mysql
-5. Setup database with access to newly created users
-6. Clone the repo in the host machine
-8. Install [laravel deployer](https://github.com/deployphp/deployer)
-9. Create a deploy script for laravel deployer
-10. Deploy the application using laravel deployer
+```ini
+[servers]
+foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubuntu ansible_ssh_private=~/.ssh/id_ed25519
+```
+
+#### 2. Tasks
+- [X] Install nginx
+- [X] Install PHP 8.1
+- [X] Install mariadb
+- [X] Setup mariadb database
+- [X] Setup mariadb user
