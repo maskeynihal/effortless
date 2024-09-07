@@ -1,0 +1,13 @@
+---
+- hosts: servers
+  gather_facts: true
+
+  tasks:
+    - name: Install nginx
+      include_tasks: tasks/install-nginx.yml
+
+    - name: Install PHP 8.1
+      include_tasks: tasks/install-php.yml
+
+    - name: Install mariadb
+      include_tasks: tasks/install-mariadb.yml
