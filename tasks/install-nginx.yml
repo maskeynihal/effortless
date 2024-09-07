@@ -1,0 +1,7 @@
+---
+- name: Install nginx
+  become: true
+  apt:
+    state: present
+    name:
+      - nginx
