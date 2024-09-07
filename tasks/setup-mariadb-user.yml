@@ -1,0 +1,8 @@
+---
+- name: Create new mariadb user
+  become: true
+  mysql_user:
+    name: "{{ username }}"
+    password: "{{ password }}"
+    priv: "{{ database }}.*:ALL"
+    state: present
