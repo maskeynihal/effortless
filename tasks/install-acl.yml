@@ -1,7 +1,0 @@
----
-- name: Install acl
-  become: true
-  apt:
-    state: present
-    name:
-      - acl

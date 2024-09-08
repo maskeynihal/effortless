@@ -34,24 +34,24 @@
         update_cache: yes
         cache_valid_time: 86400
 
+    - name: Install acl, git, nginx, mariadb-server, python3-mysqldb, certbot
+      become: true
+      apt:
+        state: present
+        name:
+          - acl
+          - git
+          - nginx
+          - mariadb-server
+          - python3-mysqldb
+          - certbot
+
   tasks:
-    - name: Install acl
-      include_tasks: tasks/install-acl.yml
-
-    - name: Install git
-      include_tasks: tasks/install-git.yml
-
-    - name: Install nginx
-      include_tasks: tasks/install-nginx.yml
-
     - name: Install PHP
       include_tasks: tasks/install-php.yml
 
     - name: Install composer
       include_tasks: tasks/install-composer.yml
-
-    - name: Install mariadb
-      include_tasks: tasks/install-mariadb.yml
 
     - name: Setup mariadb database
       include_tasks: tasks/setup-mariadb-database.yml

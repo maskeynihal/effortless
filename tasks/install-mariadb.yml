@@ -1,8 +1,0 @@
----
-- name: Install mariadb
-  become: true
-  apt:
-    state: present
-    name:
-      - mariadb-server
-      - python3-mysqldb
