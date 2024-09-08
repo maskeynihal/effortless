@@ -14,6 +14,7 @@ add('writable_dirs', []);
 
 // Hosts
 host('localhost')
+  ->set('branch', '{{ git_branch }}')
   ->set('remote_user', '{{ ansible_user }}')
   ->set('deploy_path', '/var/www/{{ domain }}')
   ->set('ssh_arguments', [
