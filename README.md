@@ -18,7 +18,9 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 ```
 
 #### 2. Tasks
+- [X] Install acl
 - [X] Install git
+- [X] Install certbot
 - [X] Install nginx
 - [X] Install PHP
 - [X] Install composer
@@ -26,6 +28,9 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 - [X] Setup mariadb database
 - [X] Setup mariadb user
 - [X] Setup github repository
+- [X] Deploy github repository
+- [X] Setup nginx
+- [X] Setup SSL
 
 #### 3. Usage
 - `make list`: Output all hosts info, works as inventory script
