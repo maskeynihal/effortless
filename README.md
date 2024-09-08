@@ -14,7 +14,7 @@
 
 ```ini
 [servers]
-foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubuntu ansible_ssh_private=~/.ssh/id_ed25519
+foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubuntu ansible_ssh_private=~/.ssh/id_ed25519 ansible_ssh_common_args='-o ForwardAgent=yes'
 ```
 
 #### 2. Tasks
