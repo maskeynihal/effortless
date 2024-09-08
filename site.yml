@@ -14,6 +14,10 @@
       prompt: "New mysql Database"
       private: false
 
+    - name: github_repository
+      prompt: "Github Repository SSH URL"
+      private: false
+
   pre_tasks:
     - name: Update and upgrade apt packages
       become: true
@@ -23,6 +27,9 @@
         cache_valid_time: 86400
 
   tasks:
+    - name: Install git
+      include_tasks: tasks/install-git.yml
+
     - name: Install nginx
       include_tasks: tasks/install-nginx.yml
 
@@ -37,3 +44,6 @@
 
     - name: Setup mariadb user
       include_tasks: tasks/setup-mariadb-user.yml
+
+    - name: Setup github repository
+      include_tasks: tasks/setup-github-repository.yml
