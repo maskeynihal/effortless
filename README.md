@@ -30,3 +30,8 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 - `make check`: Don’t make any changes; instead, try to predict some of the changes that may occur
 - `make playbook`: Runs Ansible playbooks, executing the defined tasks on the targeted hosts.
 - `make playbook-no-ask-become-password`: Same as playbook but without ask for privilege escalation password (use ansible_sudo_pass)
+
+**Example:**
+```shell
+ansible-playbook -i inventory.ini site.yml -e "mysql_username=<MYSQL_USERNAME>" -e "mysql_password=<MYSQL_PASSWORD>" -e "mysql_database=<MYSQL_DATABASE>"
+```

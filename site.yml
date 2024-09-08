@@ -2,15 +2,15 @@
 - hosts: servers
   gather_facts: true
   vars_prompt:
-    - name: username
+    - name: mysql_username
       prompt: "New mysql Username"
       private: false
 
-    - name: password
+    - name: mysql_password
       prompt: "New mysql Password"
       private: false
 
-    - name: database
+    - name: mysql_database
       prompt: "New mysql Database"
       private: false
 
