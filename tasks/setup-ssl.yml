@@ -1,0 +1,27 @@
+---
+- name: Generate Diffie-Hellman keys
+  become: true
+  shell: |
+    openssl dhparam -out /etc/nginx/dhparam.pem 2048
+  args:
+    creates: /etc/nginx/dhparam.pem
+
+- name: Create a common ACME-challenge directory (for Let's Encrypt)
+  become: true
+  file:
+    path: /var/www/_letsencrypt
+    owner: www-data
+    group: www-data
+    state: directory
+    mode: '0755'
+
+- name: Certbot
+  become: true
+  shell: |
+    sed -i -r 's/(listen .*443)/\1; #/g; s/(ssl_(certificate|certificate_key|trusted_certificate) )/#;#\1/g; s/(server \{)/\1\n    ssl off;/g' /etc/nginx/sites-available/{{ domain }}.conf
+    nginx -t && sudo systemctl reload nginx
+    certbot certonly --webroot -d {{ domain }} --email info@{{ domain }} -w /var/www/_letsencrypt -n --agree-tos --force-renewal
+    sed -i -r -z 's/#?; ?#//g; s/(server \{)\n    ssl off;/\1/g' /etc/nginx/sites-available/{{ domain }}.conf
+    nginx -t && systemctl reload nginx
+    echo -e '#!/bin/bash\nnginx -t && systemctl reload nginx' | sudo tee /etc/letsencrypt/renewal-hooks/post/nginx-reload.sh
+    sudo chmod a+x /etc/letsencrypt/renewal-hooks/post/nginx-reload.sh

@@ -1,0 +1,30 @@
+---
+- name: Create a backup of your current NGINX configuration
+  become: true
+  shell: |
+    cd /etc/nginx
+    tar -czvf nginx_$(date +'%F_%H-%M-%S').tar.gz nginx.conf sites-available/ sites-enabled/ nginxconfig.io/
+
+- name: Configure /etc/nginx/nginxconfig.io/
+  become: true
+  copy:
+    src: templates/nginxconfig.io/nginxconfig.io
+    dest: /etc/nginx/nginxconfig.io/
+    mode: '0644'
+    force: no
+
+- name: Configure /etc/nginx/nginx.conf
+  become: true
+  copy:
+    src: templates/nginxconfig.io/nginx.conf
+    dest: /etc/nginx/nginx.conf
+    mode: '0644'
+    force: no
+
+- name: Configure /etc/nginx/sites-available/{{ domain }}
+  become: true
+  template:
+    src: templates/nginxconfig.io/default.template.conf
+    dest: /etc/nginx/sites-available/{{ domain }}.conf
+    mode: '0644'
+    force: no
