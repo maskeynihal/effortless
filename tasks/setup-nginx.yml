@@ -28,3 +28,8 @@
     dest: /etc/nginx/sites-available/{{ domain }}.conf
     mode: '0644'
     force: no
+
+- name: Enable {{ domain }}
+  become: true
+  shell: |
+    ln -s /etc/nginx/sites-available/{{ domain }}.conf /etc/nginx/sites-enabled/{{ domain }}.conf
