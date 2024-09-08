@@ -64,3 +64,9 @@
 
     - name: Deploy github repository
       include_tasks: tasks/deploy-github-repository.yml
+
+    - name: Setup nginx
+      include_tasks: tasks/setup-nginx.yml
+
+    - name: Setup SSL
+      include_tasks: tasks/setup-ssl.yml
