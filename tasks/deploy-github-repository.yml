@@ -1,0 +1,21 @@
+---
+- name: Install deployer
+  shell: |
+    cd "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}"
+    composer require --dev deployer/deployer
+
+- name: Copy deploy.php
+  template:
+    src: templates/deploy.template.php
+    dest: "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}/deploy.php"
+
+- name: Create application directory
+  file:
+    path: ~/application
+    state: directory
+
+- name: Deploy application
+  shell: |
+    cd "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}"
+    vendor/bin/dep deploy:unlock
+    vendor/bin/dep deploy
