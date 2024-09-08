@@ -1,7 +1,0 @@
----
-- name: Setup github repository
-  git:
-    repo: "{{ github_repository }}"
-    dest: "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}"
-    force: yes
-    accept_hostkey: yes
