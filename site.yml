@@ -31,6 +31,9 @@
         cache_valid_time: 86400
 
   tasks:
+    - name: Install acl
+      include_tasks: tasks/install-acl.yml
+
     - name: Install git
       include_tasks: tasks/install-git.yml
 
