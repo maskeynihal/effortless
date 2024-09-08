@@ -15,7 +15,7 @@ add('writable_dirs', []);
 // Hosts
 host('localhost')
   ->set('remote_user', '{{ ansible_user }}')
-  ->set('deploy_path', '~/application')
+  ->set('deploy_path', '/var/www/{{ domain }}')
   ->set('ssh_arguments', [
     '-o UserKnownHostsFile=/dev/null',
     '-o StrictHostKeyChecking=no'

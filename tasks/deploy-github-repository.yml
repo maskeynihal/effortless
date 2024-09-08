@@ -9,10 +9,14 @@
     src: templates/deploy.template.php
     dest: "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}/deploy.php"
 
-- name: Create application directory
+- name: Create /var/www/{{ domain }} directory
+  become: true
   file:
-    path: ~/application
+    path: "/var/www/{{ domain }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
     state: directory
+    mode: '0755'
 
 - name: Deploy application
   shell: |

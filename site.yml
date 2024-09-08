@@ -2,6 +2,10 @@
 - hosts: servers
   gather_facts: true
   vars_prompt:
+    - name: domain
+      prompt: "Domain"
+      private: false
+
     - name: php_version
       prompt: "PHP Version"
       private: false
