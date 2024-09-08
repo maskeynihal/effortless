@@ -21,5 +21,4 @@
 - name: Deploy application
   shell: |
     cd "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}"
-    vendor/bin/dep deploy:unlock
     vendor/bin/dep deploy
