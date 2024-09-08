@@ -6,7 +6,7 @@ require 'recipe/laravel.php';
 
 // Config
 
-set('repository', '{{ github_repository }}');
+set('repository', '{{ git_repository }}');
 
 add('shared_files', []);
 add('shared_dirs', []);

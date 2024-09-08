@@ -47,5 +47,6 @@ ansible-playbook -i inventory.ini site.yml \
 -e "mysql_username=<MYSQL_USERNAME>" \
 -e "mysql_password=<MYSQL_PASSWORD>" \
 -e "mysql_database=<MYSQL_DATABASE>" \
--e "github_repository=<GITHUB_SSH_URL>"
+-e "git_branch=<GIT_BRANCH>"
+-e "git_repository=<GIT_REPOSITORY_SSH_URL>"
 ```

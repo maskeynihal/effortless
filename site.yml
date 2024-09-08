@@ -22,8 +22,12 @@
       prompt: "New mysql Database"
       private: false
 
-    - name: github_repository
-      prompt: "Github Repository SSH URL"
+    - name: git_repository
+      prompt: "Git repository SSH URL"
+      private: false
+
+    - name: git_branch
+      prompt: "Git repository branch"
       private: false
 
   pre_tasks:
@@ -59,8 +63,8 @@
     - name: Setup mariadb user
       include_tasks: tasks/setup-mariadb-user.yml
 
-    - name: Deploy github repository
-      include_tasks: tasks/deploy-github-repository.yml
+    - name: Deploy git repository
+      include_tasks: tasks/deploy-git-repository.yml
 
     - name: Setup nginx
       include_tasks: tasks/setup-nginx.yml
