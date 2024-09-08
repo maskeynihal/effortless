@@ -27,7 +27,6 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 - [X] Install mariadb
 - [X] Setup mariadb database
 - [X] Setup mariadb user
-- [X] Setup github repository
 - [X] Deploy github repository
 - [X] Setup nginx
 - [X] Setup SSL
