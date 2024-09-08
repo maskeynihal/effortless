@@ -12,8 +12,6 @@ add('shared_files', []);
 add('shared_dirs', []);
 add('writable_dirs', []);
 
-set('writable_mode', 'chmod');
-
 // Hosts
 host('localhost')
   ->set('remote_user', '{{ ansible_user }}')
