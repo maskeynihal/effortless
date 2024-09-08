@@ -3,6 +3,12 @@
   git:
     repo: "{{ github_repository }}"
     dest: "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}"
-    version: "main"
     force: yes
     accept_hostkey: yes
+
+- name: Install deployer
+  shell: |
+    cd "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}"
+    composer require --dev deployer/deployer
+  args:
+    creates: "{{ ansible_env.HOME }}/{{ github_repository|splitext|first|split(':')|last }}/composer.lock"

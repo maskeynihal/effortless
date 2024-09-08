@@ -1,0 +1,17 @@
+---
+- name: Download and install composer
+  shell: curl -sS https://getcomposer.org/installer | php
+  become: true
+  args:
+    chdir: /usr/src/
+    creates: /usr/local/bin/composer
+
+- name: Add composer to global path
+  become: true
+  copy:
+    dest: /usr/local/bin/composer
+    group: root
+    mode: 0755
+    owner: root
+    src: /usr/src/composer.phar
+    remote_src: yes

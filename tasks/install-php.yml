@@ -1,15 +1,21 @@
 ---
-- name: Install PHP 8.1
+- name: Add ppa:ondrej/php repository
+  become: true
+  apt_repository:
+    repo: ppa:ondrej/php
+    state: present
+
+- name: Install PHP
   become: true
   apt:
     state: present
     name:
-      - php8.1-fpm
-      - php8.1-common
-      - php8.1-mbstring
-      - php8.1-gd
-      - php8.1-xml
-      - php8.1-mysql
-      - php8.1-cli
-      - php8.1-zip
-      - php8.1-curl
+      - php{{ php_version }}-fpm
+      - php{{ php_version }}-common
+      - php{{ php_version }}-mbstring
+      - php{{ php_version }}-gd
+      - php{{ php_version }}-xml
+      - php{{ php_version }}-mysql
+      - php{{ php_version }}-cli
+      - php{{ php_version }}-zip
+      - php{{ php_version }}-curl

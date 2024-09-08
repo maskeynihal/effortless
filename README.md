@@ -19,7 +19,7 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 
 #### 2. Tasks
 - [X] Install nginx
-- [X] Install PHP 8.1
+- [X] Install PHP
 - [X] Install mariadb
 - [X] Setup mariadb database
 - [X] Setup mariadb user
@@ -34,6 +34,7 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 **Example:**
 ```shell
 ansible-playbook -i inventory.ini site.yml \
+-e "php_version=<PHP_VERSION>"
 -e "mysql_username=<MYSQL_USERNAME>" \
 -e "mysql_password=<MYSQL_PASSWORD>" \
 -e "mysql_database=<MYSQL_DATABASE>" \
