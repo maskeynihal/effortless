@@ -1,18 +1,18 @@
 ---
 - name: Create deployer directory
   file:
-    path: "~/{{ github_repository|splitext|first|split(':')|last }}"
+    path: "~/{{ git_repository|splitext|first|split(':')|last }}"
     state: directory
 
 - name: Install deployer
   shell: |
-    cd ~/{{ github_repository|splitext|first|split(':')|last }}
+    cd ~/{{ git_repository|splitext|first|split(':')|last }}
     composer require --dev deployer/deployer
 
 - name: Copy deploy.php
   template:
     src: templates/deploy.template.php
-    dest: "~/{{ github_repository|splitext|first|split(':')|last }}/deploy.php"
+    dest: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.php"
 
 - name: Create /var/www/{{ domain }} directory
   become: true
@@ -25,5 +25,5 @@
 
 - name: Deploy application
   shell: |
-    cd ~/{{ github_repository|splitext|first|split(':')|last }}
+    cd ~/{{ git_repository|splitext|first|split(':')|last }}
     vendor/bin/dep deploy
