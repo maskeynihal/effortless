@@ -25,3 +25,5 @@
     nginx -t && systemctl reload nginx
     echo -e '#!/bin/bash\nnginx -t && systemctl reload nginx' | sudo tee /etc/letsencrypt/renewal-hooks/post/nginx-reload.sh
     sudo chmod a+x /etc/letsencrypt/renewal-hooks/post/nginx-reload.sh
+  args:
+    creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
