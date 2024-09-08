@@ -14,3 +14,13 @@ playbook:
 
 playbook-no-ask-become-pass:
 	ansible-playbook -i inventory.ini site.yml
+
+playbook-test:
+	ansible-playbook -i inventory.ini site.yml \
+	-e "domain=example.com" \
+	-e "php_version=8.2" \
+	-e "mysql_username=admin" \
+	-e "mysql_password=admin" \
+	-e "mysql_database=laravel" \
+	-e "github_repository=git@github.com:laravel/laravel.git" \
+	-vvv
