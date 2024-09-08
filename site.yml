@@ -2,6 +2,10 @@
 - hosts: servers
   gather_facts: true
   vars_prompt:
+    - name: php_version
+      prompt: "PHP Version"
+      private: false
+
     - name: mysql_username
       prompt: "New mysql Username"
       private: false
@@ -33,8 +37,11 @@
     - name: Install nginx
       include_tasks: tasks/install-nginx.yml
 
-    - name: Install PHP 8.1
+    - name: Install PHP
       include_tasks: tasks/install-php.yml
+
+    - name: Install composer
+      include_tasks: tasks/install-composer.yml
 
     - name: Install mariadb
       include_tasks: tasks/install-mariadb.yml
