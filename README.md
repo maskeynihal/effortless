@@ -33,5 +33,9 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 
 **Example:**
 ```shell
-ansible-playbook -i inventory.ini site.yml -e "mysql_username=<MYSQL_USERNAME>" -e "mysql_password=<MYSQL_PASSWORD>" -e "mysql_database=<MYSQL_DATABASE>"
+ansible-playbook -i inventory.ini site.yml \
+-e "mysql_username=<MYSQL_USERNAME>" \
+-e "mysql_password=<MYSQL_PASSWORD>" \
+-e "mysql_database=<MYSQL_DATABASE>" \
+-e "github_repository=<GITHUB_SSH_URL>"
 ```
