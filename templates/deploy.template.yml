@@ -1,0 +1,21 @@
+import:
+  - recipe/laravel.php
+
+config:
+  repository: {{ git_repository }}
+  shared_dirs:
+    - vendor
+    - storage
+
+hosts:
+  {{ domain }}:
+    branch: {{ git_branch }}
+    hostname: localhost
+    remote_user: {{ ansible_user }}
+    deploy_path: /var/www/{{ domain }}
+    ssh_arguments:
+      - -o UserKnownHostsFile=/dev/null
+      - -o StrictHostKeyChecking=no
+
+after:
+  deploy:failed: deploy:unlock

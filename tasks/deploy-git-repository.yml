@@ -4,10 +4,11 @@
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
     composer require --dev deployer/deployer
 
-- name: Copy deploy.php
+- name: Copy deploy.yml
   template:
-    src: templates/deploy.template.php
-    dest: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.php"
+    src: templates/deploy.template.yml
+    dest: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.yml"
+    force: false
 
 - name: Create /var/www/{{ domain }} directory
   become: true
