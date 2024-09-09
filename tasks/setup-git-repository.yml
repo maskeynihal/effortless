@@ -1,0 +1,7 @@
+---
+- name: Setup github repository
+  git:
+    repo: "{{ git_repository }}"
+    dest: "~/{{ git_repository|splitext|first|split(':')|last }}"
+    force: yes
+    accept_hostkey: yes

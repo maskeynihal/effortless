@@ -1,9 +1,4 @@
 ---
-- name: Create deployer directory
-  file:
-    path: "~/{{ git_repository|splitext|first|split(':')|last }}"
-    state: directory
-
 - name: Install deployer
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
