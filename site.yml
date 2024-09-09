@@ -63,6 +63,9 @@
     - name: Setup mariadb user
       include_tasks: tasks/setup-mariadb-user.yml
 
+    - name: Setup git repository
+      include_tasks: tasks/setup-git-repository.yml
+
     - name: Deploy git repository
       include_tasks: tasks/deploy-git-repository.yml
 
