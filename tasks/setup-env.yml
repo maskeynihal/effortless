@@ -14,3 +14,24 @@
     DB_DATABASE: "{{ vault_response.json.data.data.DB_DATABASE }}"
     DB_USERNAME: "{{ vault_response.json.data.data.DB_USERNAME }}"
     DB_PASSWORD: "{{ vault_response.json.data.data.DB_PASSWORD }}"
+
+- name: Convert Vault JSON response to .env format
+  set_fact:
+    env_content: |
+      {% for key, value in vault_response.json.data.data.items() %}
+      {{ key | upper }}={{ value }}
+      {% endfor %}
+
+- name: Create /var/www/{{ domain }}/shared directory
+  become: true
+  file:
+    path: "/var/www/{{ domain }}/shared"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    state: directory
+    mode: '0755'
+
+- name: Create .env file
+  copy:
+    dest: "/var/www/{{ domain }}/shared/.env"
+    content: "{{ env_content }}"
