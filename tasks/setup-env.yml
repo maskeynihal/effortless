@@ -33,5 +33,6 @@
 
 - name: Create .env file
   copy:
+    force: no
     dest: "/var/www/{{ domain }}/shared/.env"
     content: "{{ env_content }}"
