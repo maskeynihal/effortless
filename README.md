@@ -5,6 +5,7 @@
 - [OpenSSH Server](https://ubuntu.com/server/docs/service-openssh)
 - [Ubuntu Server](https://ubuntu.com/download/server)
 - [SSH Setup](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent)
+- [Vault](https://www.vaultproject.io/)
 
 #### 1. Inventory
 - `ansible_connection`
@@ -48,4 +49,26 @@ ansible-playbook -i inventory.ini site.yml \
 -e "git_repository=<GIT_REPOSITORY_SSH_URL>" \
 -e "vault_url=<VAULT_URL>" \
 -e "vault_access_token=<VAULT_TOKEN>"
+```
+
+#### 4. Vault Secrets
+
+```json
+{
+  "APP_DEBUG": true,
+  "APP_ENV": "local",
+  ...
+  "DB_CONNECTION": "mysql",
+  "DB_DATABASE": "laravel",
+  "DB_HOST": "127.0.0.1",
+  "DB_PASSWORD": "admin",
+  "DB_PORT": "3306",
+  "DB_USERNAME": "admin",
+  ...
+  "SESSION_DRIVER": "database",
+  "SESSION_ENCRYPT": false,
+  "SESSION_LIFETIME": "120",
+  "SESSION_PATH": "/",
+  "VITE_APP_NAME": "${APP_NAME}"
+}
 ```
