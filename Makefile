@@ -23,4 +23,4 @@ playbook-test:
 	-e "mysql_password=admin" \
 	-e "mysql_database=laravel" \
 	-e "git_repository=git@github.com:laravel/laravel.git" \
-	-e "git_branch=main" \
+	-e "git_branch=master"
