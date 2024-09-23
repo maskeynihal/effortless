@@ -1,0 +1,16 @@
+---
+- name: Setup .env
+  uri:
+    url: "{{ vault_url }}"
+    method: GET
+    status_code: 200
+    return_content: yes
+    headers:
+      X-Vault-Token: "{{ vault_access_token }}"
+  register: vault_response
+
+- name: Parse Vault JSON response and set variables
+  set_fact:
+    DB_DATABASE: "{{ vault_response.json.data.data.DB_DATABASE }}"
+    DB_USERNAME: "{{ vault_response.json.data.data.DB_USERNAME }}"
+    DB_PASSWORD: "{{ vault_response.json.data.data.DB_PASSWORD }}"

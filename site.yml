@@ -10,16 +10,12 @@
       prompt: "PHP Version"
       private: false
 
-    - name: mysql_username
-      prompt: "New mysql Username"
+    - name: vault_url
+      prompt: "Vault URL"
       private: false
 
-    - name: mysql_password
-      prompt: "New mysql Password"
-      private: false
-
-    - name: mysql_database
-      prompt: "New mysql Database"
+    - name: vault_access_token
+      prompt: "Vault Token"
       private: false
 
     - name: git_repository
@@ -56,6 +52,9 @@
 
     - name: Install composer
       include_tasks: tasks/install-composer.yml
+
+    - name: Setup .env
+      include_tasks: tasks/setup-env.yml
 
     - name: Setup mariadb database
       include_tasks: tasks/setup-mariadb-database.yml

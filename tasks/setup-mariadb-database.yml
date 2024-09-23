@@ -3,4 +3,4 @@
   become: true
   mysql_db:
     state: present
-    db: "{{ mysql_database }}"
+    db: "{{ DB_DATABASE }}"
