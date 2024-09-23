@@ -19,8 +19,7 @@ playbook-test:
 	ansible-playbook -i inventory.ini site.yml \
 	-e "domain=example.com" \
 	-e "php_version=8.2" \
-	-e "mysql_username=admin" \
-	-e "mysql_password=admin" \
-	-e "mysql_database=laravel" \
 	-e "git_repository=git@github.com:laravel/laravel.git" \
-	-e "git_branch=master"
+	-e "git_branch=master" \
+	-e "vault_url=http://localhost:8200/v1/secret/data/secret" \
+	-e "vault_access_token=root"

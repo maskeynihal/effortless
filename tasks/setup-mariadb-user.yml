@@ -2,7 +2,7 @@
 - name: Create new mariadb user
   become: true
   mysql_user:
-    name: "{{ mysql_username }}"
-    password: "{{ mysql_password }}"
-    priv: "{{ mysql_database }}.*:ALL"
+    name: "{{ DB_USERNAME }}"
+    password: "{{ DB_PASSWORD }}"
+    priv: "{{ DB_DATABASE }}.*:ALL"
     state: present
