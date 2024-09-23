@@ -10,14 +10,6 @@
     dest: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.yml"
     force: false
 
-- name: Create /var/www/{{ domain }} directory
-  become: true
-  file:
-    path: "/var/www/{{ domain }}"
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    state: directory
-    mode: '0755'
 
 - name: Deploy application
   shell: |
