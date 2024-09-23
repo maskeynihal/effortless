@@ -1,6 +1,9 @@
 ---
 - name: Download and install composer
-  shell: curl -sS https://getcomposer.org/installer | php
+  # https://getcomposer.org/doc/articles/troubleshooting.md#operation-timed-out-ipv6-issues-
+  shell: |
+    sh -c "echo 'precedence ::ffff:0:0/96 100' >> /etc/gai.conf"
+    curl -sS https://getcomposer.org/installer | php
   become: true
   args:
     chdir: /usr/src/
