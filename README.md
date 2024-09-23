@@ -5,6 +5,9 @@
 - [OpenSSH Server](https://ubuntu.com/server/docs/service-openssh)
 - [Ubuntu Server](https://ubuntu.com/download/server)
 - [SSH Setup](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent)
+    ```shell
+    ssh-copy-id -i ~/.ssh/mykey user@hostname
+    ```
 - [Vault](https://www.vaultproject.io/)
 
 #### 1. Inventory
