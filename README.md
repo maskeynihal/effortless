@@ -24,6 +24,7 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 - [X] Install nginx
 - [X] Install PHP
 - [X] Install composer
+- [X] Setup .env
 - [X] Install mariadb
 - [X] Setup mariadb database
 - [X] Setup mariadb user
@@ -41,11 +42,10 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 **Example:**
 ```shell
 ansible-playbook -i inventory.ini site.yml \
--e "domain=<DOMAIN>"
--e "php_version=<PHP_VERSION>"
--e "mysql_username=<MYSQL_USERNAME>" \
--e "mysql_password=<MYSQL_PASSWORD>" \
--e "mysql_database=<MYSQL_DATABASE>" \
--e "git_branch=<GIT_BRANCH>"
--e "git_repository=<GIT_REPOSITORY_SSH_URL>"
+-e "domain=<DOMAIN>" \
+-e "php_version=<PHP_VERSION>" \
+-e "git_branch=<GIT_BRANCH>" \
+-e "git_repository=<GIT_REPOSITORY_SSH_URL>" \
+-e "vault_url=<VAULT_URL>" \
+-e "vault_access_token=<VAULT_TOKEN>"
 ```
