@@ -10,7 +10,6 @@
     dest: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.yml"
     force: false
 
-
 - name: Deploy application
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
