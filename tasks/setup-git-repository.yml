@@ -5,3 +5,4 @@
     dest: "~/{{ git_repository|splitext|first|split(':')|last }}"
     force: yes
     accept_hostkey: yes
+    version: "{{ git_branch }}"
