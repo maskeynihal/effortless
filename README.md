@@ -29,9 +29,9 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 - [X] Install PHP
 - [X] Install composer
 - [X] Setup .env
-- [X] Install mariadb
-- [X] Setup mariadb database
-- [X] Setup mariadb user
+- [X] Install mysql
+- [X] Setup mysql database
+- [X] Setup mysql user
 - [X] Deploy github repository
 - [X] Setup nginx
 - [X] Setup SSL

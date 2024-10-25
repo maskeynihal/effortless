@@ -1,5 +1,5 @@
 ---
-- name: Create new mariadb user
+- name: Create new mysql user
   become: true
   mysql_user:
     name: "{{ DB_USERNAME }}"
