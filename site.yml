@@ -34,7 +34,7 @@
         update_cache: yes
         cache_valid_time: 86400
 
-    - name: Install acl, git, nginx, mariadb-server, python3-mysqldb, certbot
+    - name: Install acl, git, nginx, mysql-server, python3-mysqldb, certbot
       become: true
       apt:
         state: present
@@ -42,7 +42,7 @@
           - acl
           - git
           - nginx
-          - mariadb-server
+          - mysql-server
           - python3-mysqldb
           - certbot
 
@@ -56,11 +56,11 @@
     - name: Setup .env
       include_tasks: tasks/setup-env.yml
 
-    - name: Setup mariadb database
-      include_tasks: tasks/setup-mariadb-database.yml
+    - name: Setup mysql database
+      include_tasks: tasks/setup-mysql-database.yml
 
-    - name: Setup mariadb user
-      include_tasks: tasks/setup-mariadb-user.yml
+    - name: Setup mysql user
+      include_tasks: tasks/setup-mysql-user.yml
 
     - name: Setup git repository
       include_tasks: tasks/setup-git-repository.yml

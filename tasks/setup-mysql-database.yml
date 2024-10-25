@@ -1,5 +1,5 @@
 ---
-- name: Create new mariadb database
+- name: Create new mysql database
   become: true
   mysql_db:
     state: present
