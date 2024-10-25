@@ -27,12 +27,16 @@
       private: false
 
   pre_tasks:
+    - name: Add the Certbot PPA
+      apt_repository:
+        state: present
+        repo: 'ppa:certbot/certbot'
+
     - name: Update and upgrade apt packages
       become: true
       apt:
         upgrade: yes
         update_cache: yes
-        cache_valid_time: 86400
 
     - name: Install acl, git, nginx, mysql-server, python3-mysqldb, certbot
       become: true
