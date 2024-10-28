@@ -1,0 +1,58 @@
+---
+- name: Install postgresql, python3-psycopg2
+  become: true
+  apt:
+    state: present
+    name:
+      - postgresql
+      - python3-psycopg2
+
+- name: Ensure PostgreSQL service is started and enabled
+  become: true
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
+
+- name: Restart PostgreSQL
+  become: true
+  service:
+    name: postgresql
+    state: restarted
+
+- name: Create new PostgreSQL database
+  become: true
+  become_user: postgres
+  postgresql_db:
+    name: "{{ DB_DATABASE }}"
+    state: present
+
+- name: Create new PostgreSQL user
+  become: true
+  become_user: postgres
+  postgresql_user:
+    db: "{{ DB_DATABASE }}"
+    name: "{{ DB_USERNAME }}"
+    password: "{{ DB_PASSWORD }}"
+    state: present
+
+- name: Set the PostgreSQL user privileges
+  become: true
+  become_user: postgres
+  postgresql_privs:
+    database: "{{ DB_DATABASE }}"
+    state: present
+    privs: ALL
+    type: database
+    roles: "{{ DB_USERNAME }}"
+
+- name: Add entries to pg_hba
+  become: true
+  become_user: postgres
+  postgresql_pg_hba:
+    dest: "/etc/postgresql/16/main/pg_hba.conf"
+    address: 127.0.0.1/32
+    contype: host
+    databases: "{{ DB_DATABASE }}"
+    method: scram-sha-256
+    users: "{{ DB_USERNAME }}"
