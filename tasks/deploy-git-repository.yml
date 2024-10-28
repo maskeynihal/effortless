@@ -13,4 +13,4 @@
 - name: Deploy application
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
-    vendor/bin/dep deploy {{ git_branch }} -vvv
+    vendor/bin/dep deploy
