@@ -18,7 +18,7 @@ playbook:
 playbook-no-ask-become-pass:
 	ansible-playbook -i inventory.ini site.yml
 
-playbook-test:
+playbook-test: galaxy
 	ansible-playbook -i inventory.ini site.yml \
 	-e "domain=example.com" \
 	-e "php_version=8.2" \
