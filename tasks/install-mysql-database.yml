@@ -1,0 +1,22 @@
+---
+- name: Install mysql-server, python3-mysqldb
+  become: true
+  apt:
+    state: present
+    name:
+      - mysql-server
+      - python3-mysqldb
+
+- name: Create new mysql database
+  become: true
+  mysql_db:
+    state: present
+    db: "{{ DB_DATABASE }}"
+
+- name: Create new mysql user
+  become: true
+  mysql_user:
+    name: "{{ DB_USERNAME }}"
+    password: "{{ DB_PASSWORD }}"
+    priv: "{{ DB_DATABASE }}.*:ALL"
+    state: present

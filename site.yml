@@ -34,7 +34,7 @@
         update_cache: yes
         cache_valid_time: 0
 
-    - name: Install acl, git, nginx, mysql-server, python3-mysqldb
+    - name: Install acl, git, nginx
       become: true
       apt:
         state: present
@@ -42,8 +42,6 @@
           - acl
           - git
           - nginx
-          - mysql-server
-          - python3-mysqldb
 
   tasks:
     - name: Install certbot
@@ -58,11 +56,11 @@
     - name: Setup .env
       include_tasks: tasks/setup-env.yml
 
-    - name: Setup mysql database
-      include_tasks: tasks/setup-mysql-database.yml
+    - name: Install & Setup MySQL database
+      include_tasks: tasks/install-mysql-database.yml
 
-    - name: Setup mysql user
-      include_tasks: tasks/setup-mysql-user.yml
+    - name: Install & Setup PostgreSQL database
+      include_tasks: tasks/install-postgres-database.yml
 
     - name: Setup git repository
       include_tasks: tasks/setup-git-repository.yml

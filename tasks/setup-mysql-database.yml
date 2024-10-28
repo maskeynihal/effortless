@@ -1,6 +1,0 @@
----
-- name: Create new mysql database
-  become: true
-  mysql_db:
-    state: present
-    db: "{{ DB_DATABASE }}"

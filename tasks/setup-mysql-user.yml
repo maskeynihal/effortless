@@ -1,8 +1,0 @@
----
-- name: Create new mysql user
-  become: true
-  mysql_user:
-    name: "{{ DB_USERNAME }}"
-    password: "{{ DB_PASSWORD }}"
-    priv: "{{ DB_DATABASE }}.*:ALL"
-    state: present
