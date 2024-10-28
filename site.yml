@@ -58,9 +58,11 @@
 
     - name: Install & Setup MySQL database
       include_tasks: tasks/install-mysql-database.yml
+      when: DB_CONNECTION == "mysql"
 
     - name: Install & Setup PostgreSQL database
       include_tasks: tasks/install-postgres-database.yml
+      when: DB_CONNECTION == "pgsql"
 
     - name: Setup git repository
       include_tasks: tasks/setup-git-repository.yml
