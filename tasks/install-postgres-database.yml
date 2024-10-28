@@ -1,10 +1,20 @@
 ---
+- name: Install postgresql-common
+  become: true
+  apt:
+    state: present
+    name: postgresql-common
+
+- name: Automated repository configuration
+  become: true
+  shell: /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -i -v 16
+
 - name: Install postgresql, python3-psycopg2
   become: true
   apt:
     state: present
     name:
-      - postgresql
+      - postgresql-16
       - python3-psycopg2
 
 - name: Ensure PostgreSQL service is started and enabled
