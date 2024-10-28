@@ -19,7 +19,11 @@
   set_fact:
     env_content: |
       {% for key, value in vault_response.json.data.data.items() %}
+      {% if " " in value %}
+      {{ key | upper }}="{{ value }}"
+      {% else %}
       {{ key | upper }}={{ value }}
+      {% endif %}
       {% endfor %}
 
 - name: Create /var/www/{{ domain }}/shared directory
