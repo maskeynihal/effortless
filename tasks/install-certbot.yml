@@ -1,0 +1,8 @@
+---
+- name: Install certbot
+  shell: |
+    snap install --classic certbot
+    sudo ln -s /snap/bin/certbot /usr/local/bin/certbot
+  become: true
+  args:
+    creates: /usr/local/bin/certbot
