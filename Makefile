@@ -1,5 +1,8 @@
 HOSTS ?= servers
 
+galaxy:
+	ansible-galaxy collection install -r galaxy-requirements.yml
+
 list:
 	ansible-inventory -i inventory.ini --list
 
