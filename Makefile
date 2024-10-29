@@ -21,6 +21,8 @@ playbook-no-ask-become-pass:
 playbook-test: galaxy
 	ansible-playbook -i inventory.ini site.yml \
 	-e "domain=example.com" \
+	-e "nvm_version=v0.40.0" \
+	-e "node_version=v22.10.0" \
 	-e "php_version=8.2" \
 	-e "git_repository=git@github.com:laravel/laravel.git" \
 	-e "git_branch=master" \
