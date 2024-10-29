@@ -16,10 +16,10 @@ ping:
 check:
 	ansible-playbook -i inventory.ini site.yml --ask-become-pass --check
 
-playbook:
+playbook: galaxy ssh
 	ansible-playbook -i inventory.ini site.yml --ask-become-pass
 
-playbook-no-ask-become-pass:
+playbook-no-ask-become-pass: galaxy ssh
 	ansible-playbook -i inventory.ini site.yml
 
 playbook-test: galaxy ssh
