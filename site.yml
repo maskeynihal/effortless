@@ -6,6 +6,14 @@
       prompt: "Domain"
       private: false
 
+    - name: nvm_version
+      prompt: "NVM Version"
+      private: false
+
+    - name: node_version
+      prompt: "Node.js Version"
+      private: false
+
     - name: php_version
       prompt: "PHP Version"
       private: false
@@ -50,7 +58,7 @@
           - nginx
 
     - name: Install nvm
-      shell: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+      shell: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | bash
       args:
         creates: ~/.nvm/nvm.sh
 
