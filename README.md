@@ -18,7 +18,7 @@
 
 ```ini
 [servers]
-foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubuntu ansible_ssh_private=~/.ssh/id_ed25519 ansible_ssh_common_args='-o ForwardAgent=yes'
+foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubuntu ansible_ssh_private=~/.ssh/id_ed25519 ansible_ssh_common_args='-o ForwardAgent=yes -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes'
 ```
 
 #### 2. Tasks
@@ -26,12 +26,15 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 - [X] Install git
 - [X] Install certbot
 - [X] Install nginx
+- [X] Install nvm
+- [X] Install node.js
 - [X] Install PHP
 - [X] Install composer
 - [X] Setup .env
-- [X] Install mysql
-- [X] Setup mysql database
-- [X] Setup mysql user
+- [X] Install mysql|pgsql
+- [X] Setup mysql|pgsql database
+- [X] Setup mysql|pgsql user
+- [X] Setup github repository
 - [X] Deploy github repository
 - [X] Setup nginx
 - [X] Setup SSL
