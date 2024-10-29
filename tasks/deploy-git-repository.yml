@@ -3,6 +3,7 @@
   shell: |
     IP=$(wget -q -O - ipinfo.io/ip)
     ssh-keygen -F $IP >/dev/null || ssh-keyscan -H $IP >> ~/.ssh/known_hosts
+  ignore_errors: true
 
 - name: Install deployer
   shell: |
