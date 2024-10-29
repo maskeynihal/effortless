@@ -46,15 +46,10 @@
     password: "{{ DB_PASSWORD }}"
     state: present
 
-- name: Set the PostgreSQL user privileges
+- name: Change owner of the database to new user
   become: true
   become_user: postgres
-  postgresql_privs:
-    database: "{{ DB_DATABASE }}"
-    state: present
-    privs: ALL
-    type: database
-    roles: "{{ DB_USERNAME }}"
+  command: psql -c 'ALTER DATABASE {{ DB_DATABASE }} owner to {{ DB_USERNAME }};'
 
 - name: Add entries to pg_hba
   become: true
