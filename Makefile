@@ -1,5 +1,9 @@
 HOSTS ?= servers
 
+ssh:
+	ssh-add -D
+	ansible all -i inventory.ini -m shell -a "ssh -T git@github.com || true"
+
 galaxy:
 	ansible-galaxy collection install -r galaxy-requirements.yml
 
@@ -18,7 +22,7 @@ playbook:
 playbook-no-ask-become-pass:
 	ansible-playbook -i inventory.ini site.yml
 
-playbook-test: galaxy
+playbook-test: galaxy ssh
 	ansible-playbook -i inventory.ini site.yml \
 	-e "domain=example.com" \
 	-e "nvm_version=v0.40.0" \
