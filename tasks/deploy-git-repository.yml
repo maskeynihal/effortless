@@ -13,6 +13,8 @@
 - name: Add node and npm symlinks for non-login shell
   become: true
   shell: |
+    rm -f /usr/bin/node
+    rm -f /usr/bin/npm
     ln -s {{ ansible_env.HOME }}/.nvm/versions/node/{{ node_version }}/bin/node /usr/bin/
     ln -s {{ ansible_env.HOME }}/.nvm/versions/node/{{ node_version }}/bin/npm /usr/bin/
 
@@ -24,5 +26,5 @@
 - name: Remove node and npm symlinks
   become: true
   shell: |
-    rm /usr/bin/node
-    rm /usr/bin/npm
+    rm -f /usr/bin/node
+    rm -f /usr/bin/npm
