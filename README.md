@@ -47,6 +47,8 @@ foo.example.com ansible_connection=ssh ansible_user=ubuntu ansible_sudo_pass=ubu
 ```shell
 ansible-playbook -i inventory.ini site.yml \
 -e "domain=<DOMAIN>" \
+-e "nvm_version=<NVM_VERSION>" \
+-e "node_version=<NODE_VERSION>" \
 -e "php_version=<PHP_VERSION>" \
 -e "git_branch=<GIT_BRANCH>" \
 -e "git_repository=<GIT_REPOSITORY_SSH_URL>" \
