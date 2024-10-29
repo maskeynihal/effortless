@@ -25,6 +25,12 @@
     - name: git_branch
       prompt: "Git repository branch"
       private: false
+      default: "{{ domain }}"
+
+    - name: deploy_namespace
+      prompt: "Deploy namespace"
+      private: false
+      default: "{{ domain | default('main') }}"
 
   pre_tasks:
     - name: Update and upgrade apt packages

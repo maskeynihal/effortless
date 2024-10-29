@@ -4,13 +4,19 @@
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
     composer require --dev deployer/deployer
 
+- name: Check if 'deploy.yml' exists in the project
+  stat:
+    path: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.yaml"
+  register: deploy_yml_file_check
+
 - name: Copy deploy.yml
   template:
     src: templates/deploy.template.yml
-    dest: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.yml"
+    dest: "~/{{ git_repository|splitext|first|split(':')|last }}/deploy.yaml"
     force: false
+  when: deploy_yml_file_check.stat.exists == False
 
 - name: Deploy application
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
-    vendor/bin/dep deploy
+    vendor/bin/dep deploy {{ deploy_namespace }} -o hostname=localhost
