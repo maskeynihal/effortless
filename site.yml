@@ -49,7 +49,7 @@
         cache_valid_time: 0
       ignore_errors: true
 
-    - name: Install acl, git, nginx
+    - name: Install acl, git, nginx, zip, unzip
       become: true
       apt:
         state: present
@@ -57,6 +57,8 @@
           - acl
           - git
           - nginx
+          - zip
+          - unzip
 
   tasks:
     - name: Install certbot
