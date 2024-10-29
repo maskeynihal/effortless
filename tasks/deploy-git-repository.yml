@@ -13,8 +13,8 @@
 - name: Add node and npm symlinks for non-login shell
   become: true
   shell: |
-    ln -s ~/.nvm/versions/node/{{ node_version }}/bin/node /usr/bin/
-    ln -s ~/.nvm/versions/node/{{ node_version }}/bin/npm /usr/bin/
+    ln -s {{ ansible_env.HOME }}/.nvm/versions/node/{{ node_version }}/bin/node /usr/bin/
+    ln -s {{ ansible_env.HOME }}/.nvm/versions/node/{{ node_version }}/bin/npm /usr/bin/
 
 - name: Deploy application
   shell: |
