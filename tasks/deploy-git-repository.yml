@@ -1,4 +1,9 @@
 ---
+- name: Add IP to ~/.ssh/know_hosts
+  shell: |
+    IP=$(wget -q -O - ipinfo.io/ip)
+    ssh-keygen -F $IP >/dev/null || ssh-keyscan -H $IP >> ~/.ssh/known_hosts
+
 - name: Install deployer
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
@@ -21,7 +26,7 @@
 - name: Deploy application
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
-    vendor/bin/dep deploy {{ deploy_namespace }} -o hostname=localhost
+    vendor/bin/dep deploy {{ deploy_namespace }}
 
 - name: Remove node and npm symlinks
   become: true
