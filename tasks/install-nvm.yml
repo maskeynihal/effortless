@@ -1,0 +1,5 @@
+---
+- name: Install nvm
+  shell: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh | bash
+  args:
+    creates: ~/.nvm/nvm.sh
