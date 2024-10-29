@@ -49,9 +49,17 @@
           - git
           - nginx
 
+    - name: Install nvm
+      shell: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+      args:
+        creates: ~/.nvm/nvm.sh
+
   tasks:
     - name: Install certbot
       include_tasks: tasks/install-certbot.yml
+
+    - name: Install node.js
+      include_tasks: tasks/install-nodejs.yml
 
     - name: Install PHP
       include_tasks: tasks/install-php.yml
