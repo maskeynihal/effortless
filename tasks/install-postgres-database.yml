@@ -46,7 +46,7 @@
     password: "{{ DB_PASSWORD }}"
     state: present
 
-- name: Change owner of the database to new user
+- name: Change owner of the {{ DB_DATABASE }} to {{ DB_USERNAME }}
   become: true
   become_user: postgres
   command: psql -c 'ALTER DATABASE {{ DB_DATABASE }} owner to {{ DB_USERNAME }};'
