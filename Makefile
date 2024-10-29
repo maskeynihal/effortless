@@ -2,7 +2,7 @@ HOSTS ?= servers
 
 ssh:
 	ssh-add -D
-	ansible all -i inventory.ini -m shell -a "ssh -T git@github.com || true"
+	ansible all -i inventory.ini -m shell -a "ssh -o StrictHostKeyChecking=no -T git@github.com || true"
 
 galaxy:
 	ansible-galaxy collection install -r galaxy-requirements.yml
