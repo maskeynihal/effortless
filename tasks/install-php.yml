@@ -19,5 +19,6 @@
       - php{{ php_version }}-pgsql
       - php{{ php_version }}-cli
       - php{{ php_version }}-zip
+      - php{{ php_version }}-unzip
       - php{{ php_version }}-curl
       - php{{ php_version }}-intl
