@@ -1,5 +1,6 @@
-- name: "Install node.js v22.10.0"
-  shell: source ~/.nvm/nvm.sh && nvm install v22.10.0
+---
+- name: "Install node.js {{ node_version }}"
+  shell: source ~/.nvm/nvm.sh && nvm install {{ node_version }}
   args:
     executable: /bin/bash
-    creates: "~/.nvm/versions/node/v22.10.0"
+    creates: "~/.nvm/versions/node/{{ node_version }}"
