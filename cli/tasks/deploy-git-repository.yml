@@ -27,7 +27,7 @@
 - name: Deploy application
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
-    vendor/bin/dep deploy {{ deploy_namespace }}
+    vendor/bin/dep deploy {{ deploy_namespace }} -o local=true
 
 - name: Remove node and npm symlinks
   become: true
