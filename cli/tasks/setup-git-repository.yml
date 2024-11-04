@@ -6,3 +6,8 @@
     force: yes
     accept_hostkey: yes
     version: "{{ git_branch }}"
+
+- name: Clean untracked files
+  shell: |
+    cd ~/{{ git_repository|splitext|first|split(':')|last }}
+    git clean -fd

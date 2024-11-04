@@ -8,11 +8,12 @@ config:
     - storage
 
 hosts:
-  {{ domain }}:
+  {{ deploy_namespace }}:
     branch: {{ git_branch }}
-    hostname: localhost
+    hostname: {{ domain }}
     remote_user: {{ ansible_user }}
     deploy_path: /var/www/{{ domain }}
+    local: true
     ssh_arguments:
       - -o UserKnownHostsFile=/dev/null
       - -o StrictHostKeyChecking=no
