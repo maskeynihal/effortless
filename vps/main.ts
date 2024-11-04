@@ -8,6 +8,7 @@ const HOME_DIR = Deno.env.get("HOME") || "~/"
 const SSH_KEY_TITLE = "Effortless Github Deploy Key"
 const SSH_KEY_NAME = "effortless"
 const SSH_KEY_PATH = path.join(HOME_DIR, ".ssh", SSH_KEY_NAME)
+const SSH_AUTHORIZED_KEYS = path.join(HOME_DIR, ".ssh", "authorized_keys")
 
 // ====================================================================================================
 console.log(`Generating public/private ed25519 key pair.`)
@@ -21,8 +22,10 @@ await command.output();
 const SSH_PRIVATE_KEY = await Deno.readTextFile(SSH_KEY_PATH)
 const SSH_PUBLIC_KEY = await Deno.readTextFile(`${SSH_KEY_PATH}.pub`)
 
-console.table(SSH_PUBLIC_KEY)
-console.log(SSH_PRIVATE_KEY)
+// ====================================================================================================
+console.log(`Adding ${SSH_KEY_PATH}.pub to ${SSH_AUTHORIZED_KEYS}\n`)
+
+await Deno.writeTextFile(SSH_AUTHORIZED_KEYS, SSH_PUBLIC_KEY, { append: true, create: true, mode: 0o600 });
 
 const GITHUB_TOKEN = prompt("GITHUB_TOKEN:", "")
 const GITHUB_REPO_OWNER = prompt("GITHUB_REPO_OWNER:", "")

