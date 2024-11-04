@@ -11,6 +11,8 @@ const SSH_KEY_PATH = path.join(HOME_DIR, ".ssh", SSH_KEY_NAME)
 const SSH_AUTHORIZED_KEYS = path.join(HOME_DIR, ".ssh", "authorized_keys")
 
 // ====================================================================================================
+// Generating public/private ed25519 key pair
+// ====================================================================================================
 console.log(`Generating public/private ed25519 key pair.`)
 console.log(SSH_KEY_PATH)
 console.log(`${SSH_KEY_PATH}.pub\n`)
@@ -22,6 +24,8 @@ await command.output();
 const SSH_PRIVATE_KEY = await Deno.readTextFile(SSH_KEY_PATH)
 const SSH_PUBLIC_KEY = await Deno.readTextFile(`${SSH_KEY_PATH}.pub`)
 
+// ====================================================================================================
+// Add effortless.pub to authorized_keys
 // ====================================================================================================
 console.log(`Adding ${SSH_KEY_PATH}.pub to ${SSH_AUTHORIZED_KEYS}\n`)
 
@@ -38,6 +42,8 @@ const headers = {
 }
 
 // ====================================================================================================
+// Add "Effortless Github Deploy Key" to Deploy Keys
+// ====================================================================================================
 console.log(`\nAdding ${SSH_KEY_TITLE} to ${GITHUB_REPO_NAME}`)
 console.log(`Validate at https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/settings/keys\n`)
 
@@ -52,6 +58,8 @@ await fetch(`https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAM
 })
 
 // ====================================================================================================
+// Generate encrypted_value for Github REST PUT
+// ====================================================================================================
 const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/actions/secrets/public-key`, { headers })
 const { key, key_id } = await response.json();
 
@@ -62,6 +70,8 @@ const binarySecret = sodium.from_string(SSH_PRIVATE_KEY)
 const encryptedBytes = sodium.crypto_box_seal(binarySecret, binaryKey)
 const encrypted_value = sodium.to_base64(encryptedBytes, sodium.base64_variants.ORIGINAL)
 
+// ====================================================================================================
+// Add effortless to action secrets as EFFORTLESS_SSH_PRIVATE_KEY
 // ====================================================================================================
 console.log(`Adding EFFORTLESS_SSH_PRIVATE_KEY to ${GITHUB_REPO_NAME} action secrets`)
 console.log(`Validate at https://github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/settings/secrets/actions`)
