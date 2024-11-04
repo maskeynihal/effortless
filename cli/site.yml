@@ -33,7 +33,7 @@
     - name: git_branch
       prompt: "Git repository branch"
       private: false
-      default: "{{ domain }}"
+      default: "{{ domain | default('main') }}"
 
     - name: deploy_namespace
       prompt: "Deploy namespace"
