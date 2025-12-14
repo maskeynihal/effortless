@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  server:
+    build: .
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      TS_NODE_TRANSPILE_ONLY: "1"
+      DB_PATH: /app/data/sessions.db
+    ports:
+      - "3000:3000"
+    volumes:
+      - ~/.ssh:/root/.ssh:ro
+      - ./keys:/app/keys:ro
+      - ./src:/app/src
+      - ./dist:/app/dist
+      - ./data:/app/data
+      - ./migrations:/app/migrations
+      - ./knexfile.cjs:/app/knexfile.cjs
+    command: sh /app/scripts/start-server.sh
+
+  cli:
+    build: .
+    env_file: .env
+    environment:
+      API_URL: http://server:3000/api
+      DB_PATH: /app/data/sessions.db
+      NODE_ENV: development
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./dist:/app/dist
+    depends_on:
+      - server
+    entrypoint: ["npm", "run", "cli"]
+    tty: true
+    stdin_open: true

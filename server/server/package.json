@@ -1,0 +1,52 @@
+{
+  "name": "effortless-github-server",
+  "version": "1.0.0",
+  "description": "SSH and GitHub integration server with CLI tool",
+  "main": "dist/server/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/server/index.ts",
+    "dev:watch": "nodemon --watch src --ext ts,json --exec ts-node src/server/index.ts",
+    "cli": "ts-node src/cli/index.ts",
+    "cli:dist": "node dist/cli/index.js",
+    "start": "node dist/server/index.js",
+    "db:shell": "node scripts/sqlite-shell.js",
+    "db:shell:docker": "docker compose exec server sh -c \"(command -v sqlite3 >/dev/null 2>&1 || (apt-get update && apt-get install -y sqlite3)) && sqlite3 \\\"${DB_PATH:-/app/data/sessions.db}\\\"\"",
+    "db:cli": "node scripts/db-cli.js",
+    "db:cli:docker": "docker compose exec -it server node scripts/db-cli.js",
+    "db:exec": "node scripts/run-sql.js",
+    "db:exec:docker": "docker compose exec server node scripts/run-sql.js",
+    "db:migrate": "npx knex migrate:latest --knexfile knexfile.cjs",
+    "db:migrate:rollback": "npx knex migrate:rollback --knexfile knexfile.cjs",
+    "db:destroy": "rm -rf ~/.effortless/sessions.db && rm -rf ./data/sessions.db && echo '✓ Database destroyed'",
+    "logs": "docker logs -f server-server-1",
+    "logs:cli": "docker logs -f server-cli-1"
+  },
+  "keywords": [
+    "ssh",
+    "github",
+    "github-api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.5",
+    "express": "^4.18.2",
+    "inquirer": "^9.2.12",
+    "knex": "^3.1.0",
+    "sqlite3": "^5.1.7",
+    "ssh2": "^1.14.0",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^20.10.6",
+    "@types/ssh2": "^1.15.5",
+    "@types/uuid": "^10.0.0",
+    "nodemon": "^3.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
