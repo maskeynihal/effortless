@@ -12,6 +12,7 @@ import {
   addApplicationStep,
   getApplicationSteps,
   updateApplicationStatus,
+  updatePrivateKeySecretName,
 } from "../shared/database";
 import { SSHConnectionStep } from "../steps/sshConnectionStep";
 import { GitHubAuthStep } from "../steps/githubAuthStep";
@@ -410,7 +411,7 @@ router.post("/step/database-create", async (req: Request, res: Response) => {
 
     let createDbCommand = "";
     if (dbType === "MySQL") {
-      createDbCommand = `mysql -u root -e "CREATE DATABASE IF NOT EXISTS \\\`${dbName}\\\`; CREATE USER IF NOT EXISTS '${dbUsername}'@'localhost' IDENTIFIED BY '${dbPassword}'; GRANT ALL PRIVILEGES ON \\\`${dbName}\\\`.* TO '${dbUsername}'@'localhost'; FLUSH PRIVILEGES;"`;
+      createDbCommand = `sudo mysql -e "CREATE DATABASE IF NOT EXISTS \\\`${dbName}\\\`; CREATE USER IF NOT EXISTS '${dbUsername}'@'localhost' IDENTIFIED BY '${dbPassword}'; GRANT ALL PRIVILEGES ON \\\`${dbName}\\\`.* TO '${dbUsername}'@'localhost'; FLUSH PRIVILEGES;"`;
     } else if (dbType === "PostgreSQL") {
       createDbCommand = `sudo -u postgres createdb ${dbName} 2>/dev/null || true; sudo -u postgres psql -c "CREATE USER ${dbUsername} WITH PASSWORD '${dbPassword}';" 2>/dev/null || true; sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${dbUsername};"`;
     }
@@ -1537,7 +1538,26 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
     }
 
     // Replace dots with underscores for secret name
-    const secretName = `PRIVATE_KEY_${applicationName.replace(/\./g, "_")}`;
+    // Replace any non-alphanumeric character with underscore, then uppercase
+    const secretName = `PRIVATE_KEY_${applicationName
+      .replace(/[^A-Za-z0-9]/g, "_")
+      .toUpperCase()}`;
+
+    // Persist the secret name in the applications table
+    try {
+      await updatePrivateKeySecretName(
+        host,
+        username,
+        applicationName,
+        secretName
+      );
+    } catch (dbErr: any) {
+      logger.warn(
+        `[SSHKeySetup] Failed to persist secret name: ${
+          dbErr?.message || dbErr
+        }`
+      );
+    }
 
     // Add private key to GitHub secret with proper encryption
     logger.info(
@@ -1774,23 +1794,22 @@ router.post(
         });
       }
 
+      // Generate hostAlias from applicationName
+      const hostAlias = `github.com-${applicationName}`;
+
       await ensureDatabaseInitialized();
       const app = await getApplicationByName(host, username, applicationName);
       if (!app) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            error: "Application not found. Please verify connection first.",
-          });
+        return res.status(404).json({
+          success: false,
+          error: "Application not found. Please verify connection first.",
+        });
       }
       if (!app.githubToken) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error: "GitHub token missing. Please authenticate GitHub first.",
-          });
+        return res.status(400).json({
+          success: false,
+          error: "GitHub token missing. Please authenticate GitHub first.",
+        });
       }
 
       // Parse owner/repo
@@ -1804,12 +1823,10 @@ router.post(
           /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/
         );
         if (!m) {
-          return res
-            .status(400)
-            .json({
-              success: false,
-              error: "Invalid repository format. Use owner/repo or GitHub URL.",
-            });
+          return res.status(400).json({
+            success: false,
+            error: "Invalid repository format. Use owner/repo or GitHub URL.",
+          });
         }
         owner = m[1];
         repoName = m[2];
@@ -1833,12 +1850,10 @@ router.post(
       );
       const baseSha = refResp.data?.object?.sha || refResp.data?.sha;
       if (!baseSha) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            error: `Base branch not found: ${baseBranch}`,
-          });
+        return res.status(404).json({
+          success: false,
+          error: `Base branch not found: ${baseBranch}`,
+        });
       }
 
       // 2) Create a feature branch
@@ -1884,12 +1899,10 @@ router.post(
       }
 
       if (!deployPath || !fileContent) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            error: "deploy.yml not found in repository",
-          });
+        return res.status(404).json({
+          success: false,
+          error: "deploy.yml not found in repository",
+        });
       }
 
       // 4) Update YAML: ensure hosts/application entry exists and update fields
@@ -1897,12 +1910,10 @@ router.post(
       try {
         doc = yaml.load(fileContent) as any;
       } catch (e: any) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error: `Invalid YAML in ${deployPath}: ${e?.message || e}`,
-          });
+        return res.status(400).json({
+          success: false,
+          error: `Invalid YAML in ${deployPath}: ${e?.message || e}`,
+        });
       }
 
       // We expect structure like: hosts: [{ application: string, remote_user, hostname, deploy_path, branch, composer_options, npm_build }]
@@ -1925,6 +1936,7 @@ router.post(
         composer_options:
           "--no-dev --optimize-autoloader --prefer-dist --no-interaction --ignore-platform-reqs",
         npm_build: "build",
+        repository: `git@${hostAlias}:${owner}/${repoName}.git`,
       };
 
       if (appIndex >= 0) {

@@ -195,6 +195,27 @@ export async function updateApplicationStatus(
 }
 
 /**
+ * Update the stored GitHub private key secret name for an application
+ */
+export async function updatePrivateKeySecretName(
+  host: string,
+  username: string,
+  applicationName: string,
+  privateKeySecretName: string
+): Promise<void> {
+  const db = getDb();
+  logger.info(
+    `[DB] Updating privateKeySecretName for ${applicationName} to ${privateKeySecretName}`
+  );
+  await db("applications")
+    .where({ host, username, applicationName })
+    .update({ privateKeySecretName });
+  logger.info(
+    `[DB] Stored privateKeySecretName for ${applicationName}: ${privateKeySecretName}`
+  );
+}
+
+/**
  * LEGACY: updateSessionStatus - redirects to updateApplicationStatus
  */
 export async function updateSessionStatus(

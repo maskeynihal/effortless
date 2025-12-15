@@ -351,7 +351,7 @@ class EffortlessCLI {
             { name: "Update .env with database config", value: "env-update" },
             { name: "Setup SSH key for GitHub Actions", value: "ssh-key" },
             {
-              name: "Update deploy.yml and open PR",
+              name: "Create GitHub Actions workflow and open PR",
               value: "deploy-workflow-update",
             },
             { name: "View step logs", value: "logs" },
@@ -859,7 +859,7 @@ class EffortlessCLI {
     }
     const [, owner, repoName] = repoMatch;
 
-    // Prompt for base branch, SSH path used by actions
+    // Prompt for base branch (SSH path is already stored in config)
     const answers = await inquirer.prompt([
       {
         type: "input",
@@ -867,109 +867,259 @@ class EffortlessCLI {
         message: "Base branch to open PR against:",
         default: "main",
       },
-      {
-        type: "input",
-        name: "sshPath",
-        message: "SSH private key file path (on server) to authorize:",
-        default: `/home/${this.config.username}/.ssh/id_ed25519`,
-      },
     ]);
 
-    console.log("\n⏳ Updating deploy.yml and creating PR...\n");
+    console.log("\n⏳ Creating GitHub Actions workflow and PR...\n");
     try {
       const headers = {
         Authorization: `Bearer ${this.config.githubToken}`,
         Accept: "application/vnd.github+json",
       };
 
+      // Use secret name stored in DB during SSH key setup
+      const appRow = await getSessionByApplication(
+        this.config.host,
+        this.config.username,
+        this.config.applicationName
+      );
+      console.log(this.config, appRow);
+      const secretName: string | undefined =
+        appRow?.privateKeySecretName ||
+        `PRIVATE_KEY_${this.config.applicationName
+          .replace(/[^A-Za-z0-9]/g, "_")
+          .toUpperCase()}`;
+
+      console.log(`🔑 Using secret name: ${secretName}`);
+      if (!secretName) {
+        console.error(
+          "❌ Secret name not found in database. Please run 'Setup SSH key for GitHub Actions' first."
+        );
+        return;
+      }
+
+      // Generate hostAlias from applicationName
+      const hostAlias = `github.com-${this.config.applicationName}`;
+
       // 1. Get base branch SHA
       console.log(`📍 Fetching base branch (${answers.baseBranch}) info...`);
-      const branchRes = await axios.get(
-        `https://api.github.com/repos/${owner}/${repoName}/branches/${answers.baseBranch}`,
-        { headers }
-      );
-      const baseSha = branchRes.data.commit.sha;
-      console.log(`✓ Base branch SHA: ${baseSha}`);
+      let baseSha: string;
+      try {
+        const branchRes = await axios.get(
+          `https://api.github.com/repos/${owner}/${repoName}/branches/${answers.baseBranch}`,
+          { headers }
+        );
+        baseSha = branchRes.data.commit.sha;
+        console.log(`✓ Base branch SHA: ${baseSha}`);
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          console.log(`⚠️  Base branch '${answers.baseBranch}' not found`);
+          console.log(`📍 Creating base branch from default branch...`);
+
+          // Get default branch
+          const repoRes = await axios.get(
+            `https://api.github.com/repos/${owner}/${repoName}`,
+            { headers }
+          );
+          const defaultBranch = repoRes.data.default_branch;
+          const defaultBranchRes = await axios.get(
+            `https://api.github.com/repos/${owner}/${repoName}/branches/${defaultBranch}`,
+            { headers }
+          );
+          baseSha = defaultBranchRes.data.commit.sha;
+
+          // Create the base branch
+          await axios.post(
+            `https://api.github.com/repos/${owner}/${repoName}/git/refs`,
+            {
+              ref: `refs/heads/${answers.baseBranch}`,
+              sha: baseSha,
+            },
+            { headers }
+          );
+          console.log(
+            `✓ Base branch '${answers.baseBranch}' created from '${defaultBranch}'`
+          );
+        } else {
+          throw err;
+        }
+      }
 
       // 2. Create feature branch
       const featureBranch = `deploy-${
         this.config.applicationName
       }-${Date.now()}`;
       console.log(`📍 Creating feature branch (${featureBranch})...`);
-      const createRefRes = await axios.post(
-        `https://api.github.com/repos/${owner}/${repoName}/git/refs`,
-        {
-          ref: `refs/heads/${featureBranch}`,
-          sha: baseSha,
-        },
-        { headers }
-      );
-      console.log(`✓ Feature branch created`);
-
-      // 3. Fetch deploy.yml/deploy.yaml
-      console.log(`📍 Fetching deploy.yml...`);
-      let deployYamlPath = "deploy.yml";
-      let deployYamlRes: any;
       try {
-        deployYamlRes = await axios.get(
-          `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yml?ref=${featureBranch}`,
+        await axios.post(
+          `https://api.github.com/repos/${owner}/${repoName}/git/refs`,
+          {
+            ref: `refs/heads/${featureBranch}`,
+            sha: baseSha,
+          },
           { headers }
         );
+        console.log(`✓ Feature branch created`);
       } catch (err: any) {
-        if (err.response?.status === 404) {
-          deployYamlPath = "deploy.yaml";
-          deployYamlRes = await axios.get(
-            `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yaml?ref=${featureBranch}`,
-            { headers }
+        if (err.response?.status === 422) {
+          console.log(
+            `⚠️  Feature branch already exists, using existing branch`
           );
         } else {
           throw err;
         }
       }
-      const currentContent = Buffer.from(
-        deployYamlRes.data.content,
-        "base64"
-      ).toString("utf8");
-      const fileSha = deployYamlRes.data.sha;
-      console.log(`✓ Deploy YAML found at: ${deployYamlPath}`);
 
-      // 4. Update YAML content
-      console.log(`📍 Updating YAML for ${this.config.applicationName}...`);
-      let parsed: any = yaml.load(currentContent) || {};
-      if (!parsed.hosts) parsed.hosts = {};
-      parsed.hosts[this.config.applicationName] = {
-        remote_user: this.config.username,
-        hostname: this.config.host,
-        deploy_path: this.config.pathname,
-        branch: answers.baseBranch,
-        composer_options: "--no-dev --optimize-autoloader",
-        npm_build: true,
+      // 3. Fetch and update deploy.yml/deploy.yaml
+      console.log(`📍 Fetching deploy.yml...`);
+      let deployYamlPath = "deploy.yml";
+      let deployYamlRes: any = null;
+      let deployYamlSha: string | undefined;
+      try {
+        deployYamlRes = await axios.get(
+          `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yml?ref=${featureBranch}`,
+          { headers }
+        );
+        deployYamlSha = deployYamlRes.data.sha;
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          deployYamlPath = "deploy.yaml";
+          try {
+            deployYamlRes = await axios.get(
+              `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yaml?ref=${featureBranch}`,
+              { headers }
+            );
+            deployYamlSha = deployYamlRes.data.sha;
+          } catch (yamlErr: any) {
+            if (yamlErr.response?.status === 404) {
+              console.log(
+                `⚠️  deploy.yml not found, skipping deploy.yml update`
+              );
+              deployYamlRes = null;
+            } else {
+              throw yamlErr;
+            }
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      // Update deploy.yml if it exists
+      if (deployYamlRes && deployYamlSha) {
+        const currentContent = Buffer.from(
+          deployYamlRes.data.content,
+          "base64"
+        ).toString("utf8");
+        console.log(`✓ Deploy YAML found at: ${deployYamlPath}`);
+
+        console.log(`📍 Updating YAML for ${this.config.applicationName}...`);
+        let parsed: any = yaml.load(currentContent) || {};
+        if (!parsed.hosts) parsed.hosts = {};
+        parsed.hosts[this.config.applicationName] = {
+          remote_user: this.config.username,
+          hostname: this.config.host,
+          deploy_path: this.config.pathname,
+          branch: answers.baseBranch,
+          composer_options: "--no-dev --optimize-autoloader",
+          npm_build: "build",
+          repository: `git@${hostAlias}:${owner}/${repoName}.git`,
+        };
+        const updatedDeployContent = yaml.dump(parsed);
+        console.log(`✓ Deploy YAML updated`);
+
+        // Commit deploy.yml
+        console.log(`📍 Committing deploy.yml...`);
+        await axios.put(
+          `https://api.github.com/repos/${owner}/${repoName}/contents/${deployYamlPath}`,
+          {
+            message: `Update deploy config for ${this.config.applicationName}`,
+            content: Buffer.from(updatedDeployContent).toString("base64"),
+            branch: featureBranch,
+            sha: deployYamlSha,
+          },
+          { headers }
+        );
+        console.log(`✓ deploy.yml committed`);
+      }
+
+      // 4. Create GitHub Actions workflow content
+      console.log(`📍 Creating workflow for ${this.config.applicationName}...`);
+      const workflowPath = `.github/workflows/laravel-project-deployment.yml`;
+      const workflowContent = `name: Deploy ${this.config.applicationName}
+run-name: Deploy to production for \${{ github.ref }} by @\${{ github.actor }} (\${{ github.sha }})
+
+on:
+  push:
+    branches:
+      - ${answers.baseBranch}
+
+jobs:
+  deploy:
+    uses: maskeynihal/gh-actions/.github/workflows/reusable_deploy_laravel.yml@main
+    with:
+      php-version: "8.3"
+    secrets:
+      PRIVATE_KEY: \${{ secrets.${secretName} }}
+      VAULT_ADDR: \${{ secrets.VAULT_ADDR }}
+      VAULT_TOKEN: \${{ secrets.VAULT_TOKEN }}
+      VAULT_PATH: \${{ vars.VAULT_PATH }}
+`;
+
+      // 5. Check if workflow file exists and get its SHA (needed for update)
+      let workflowFileSha: string | undefined;
+      try {
+        const existingFile = await axios.get(
+          `https://api.github.com/repos/${owner}/${repoName}/contents/${workflowPath}?ref=${featureBranch}`,
+          { headers }
+        );
+        workflowFileSha = existingFile.data.sha;
+        console.log(`✓ Existing workflow found, will update`);
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          console.log(`✓ Will create new workflow file`);
+        } else {
+          throw err;
+        }
+      }
+
+      // 6. Commit workflow file to feature branch
+      console.log(`📍 Committing workflow...`);
+      const commitPayload: any = {
+        message: `Add/Update deployment workflow for ${this.config.applicationName}`,
+        content: Buffer.from(workflowContent).toString("base64"),
+        branch: featureBranch,
       };
-      const updatedContent = yaml.dump(parsed);
-      console.log(`✓ YAML updated`);
+      if (workflowFileSha) {
+        commitPayload.sha = workflowFileSha;
+      }
 
-      // 5. Commit to feature branch
-      console.log(`📍 Committing changes...`);
       const commitRes = await axios.put(
-        `https://api.github.com/repos/${owner}/${repoName}/contents/${deployYamlPath}`,
-        {
-          message: `Update deploy config for ${this.config.applicationName}`,
-          content: Buffer.from(updatedContent).toString("base64"),
-          branch: featureBranch,
-          sha: fileSha,
-        },
+        `https://api.github.com/repos/${owner}/${repoName}/contents/${workflowPath}`,
+        commitPayload,
         { headers }
       );
       const commitSha = commitRes.data.commit.sha;
       console.log(`✓ Commit SHA: ${commitSha}`);
 
-      // 6. Create PR
+      // 7. Create PR
       console.log(`📍 Creating pull request...`);
       const prRes = await axios.post(
         `https://api.github.com/repos/${owner}/${repoName}/pulls`,
         {
-          title: `Deploy: Update config for ${this.config.applicationName}`,
-          body: `Automatically updated deploy configuration for **${this.config.applicationName}**\n\n- **Host**: ${this.config.host}\n- **SSH Path**: ${answers.sshPath}\n- **Path**: ${this.config.pathname}\n- **Branch**: ${answers.baseBranch}`,
+          title: `Deploy: Add deployment configuration for ${this.config.applicationName}`,
+          body: `Automatically created deployment configuration for **${
+            this.config.applicationName
+          }**\n\n### Changes\n- ${
+            deployYamlRes
+              ? `Updated \`${deployYamlPath}\` with host configuration`
+              : "deploy.yml not found (skipped)"
+          }\n- Created/Updated GitHub Actions workflow\n\n### Workflow Configuration\n- **Branch**: ${
+            answers.baseBranch
+          }\n- **Secret Name**: \`${secretName}\`\n- **PHP Version**: 8.3\n\n### Server Details\n- **Host**: ${
+            this.config.host
+          }\n- **User**: ${this.config.username}\n- **Path**: ${
+            this.config.pathname
+          }\n\n### Next Steps\nEnsure the following secrets and variables are set in your repository:\n- \`${secretName}\` - SSH private key (already set if you ran SSH key setup)\n- \`VAULT_ADDR\` - Your Vault address\n- \`VAULT_TOKEN\` - Your Vault token\n- \`VAULT_PATH\` (variable) - Path in Vault`,
           head: featureBranch,
           base: answers.baseBranch,
         },
@@ -979,10 +1129,14 @@ class EffortlessCLI {
       const prUrl = prRes.data.html_url;
       console.log(`✓ PR created: ${prUrl}`);
 
-      console.log("\n✅ Workflow updated and pull request created");
+      console.log(
+        "\n✅ Deployment configuration updated and pull request opened"
+      );
       console.log(`\n📋 Details:`);
       console.log(`  Branch: ${featureBranch}`);
-      console.log(`  File: ${deployYamlPath}`);
+      if (deployYamlRes) console.log(`  Deploy Config: ${deployYamlPath}`);
+      console.log(`  Workflow: ${workflowPath}`);
+      console.log(`  Secret Name: ${secretName}`);
       console.log(`  PR #: ${prNumber}`);
       console.log(`  URL: ${prUrl}`);
     } catch (error: any) {
