@@ -242,10 +242,7 @@ class EffortlessCLI {
     // Resolve GitHub PAT: prefer stored, then env, then prompt
     let githubToken: string | undefined = storedGithubToken;
     if (!githubToken) {
-      githubToken =
-        process.env.GH_TOKEN ||
-        process.env.GH_TOKEN_TECHNORIO_GITHUB ||
-        undefined;
+      githubToken = process.env.GH_TOKEN || undefined;
     }
     if (!githubToken) {
       const ghAns = await inquirer.prompt([
