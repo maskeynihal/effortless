@@ -4,6 +4,7 @@ import { Client as SSH2Client } from "ssh2";
 import { logger } from "../shared/logger";
 import axios from "axios";
 import sodium from "libsodium-wrappers";
+import yaml from "js-yaml";
 import {
   initializeDatabase,
   saveApplication,
@@ -1737,3 +1738,281 @@ router.get("/health", (req: Request, res: Response) => {
 });
 
 export default router;
+
+/**
+ * POST /step/deploy-workflow-update
+ * Prompt for a base branch name, update deploy.yml on a new feature branch, and open a PR.
+ * Also records branch info in the application steps log.
+ */
+router.post(
+  "/step/deploy-workflow-update",
+  async (req: Request, res: Response) => {
+    const startTime = Date.now();
+
+    try {
+      const {
+        host,
+        username,
+        applicationName,
+        selectedRepo,
+        baseBranch,
+        sshPath,
+      } = req.body;
+
+      if (
+        !host ||
+        !username ||
+        !applicationName ||
+        !selectedRepo ||
+        !baseBranch ||
+        !sshPath
+      ) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "Missing required fields: host, username, applicationName, selectedRepo, baseBranch, sshPath",
+        });
+      }
+
+      await ensureDatabaseInitialized();
+      const app = await getApplicationByName(host, username, applicationName);
+      if (!app) {
+        return res
+          .status(404)
+          .json({
+            success: false,
+            error: "Application not found. Please verify connection first.",
+          });
+      }
+      if (!app.githubToken) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "GitHub token missing. Please authenticate GitHub first.",
+          });
+      }
+
+      // Parse owner/repo
+      let owner: string;
+      let repoName: string;
+      const slashCount = (selectedRepo.match(/\//g) || []).length;
+      if (slashCount === 1 && !selectedRepo.startsWith("http")) {
+        [owner, repoName] = selectedRepo.split("/");
+      } else {
+        const m = selectedRepo.match(
+          /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/
+        );
+        if (!m) {
+          return res
+            .status(400)
+            .json({
+              success: false,
+              error: "Invalid repository format. Use owner/repo or GitHub URL.",
+            });
+        }
+        owner = m[1];
+        repoName = m[2];
+      }
+
+      const gh = axios.create({
+        baseURL: "https://api.github.com",
+        headers: {
+          Authorization: `Bearer ${app.githubToken}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+        timeout: 15000,
+      });
+
+      // 1) Resolve base branch ref/commit
+      const refResp = await gh.get(
+        `/repos/${owner}/${repoName}/git/refs/heads/${encodeURIComponent(
+          baseBranch
+        )}`
+      );
+      const baseSha = refResp.data?.object?.sha || refResp.data?.sha;
+      if (!baseSha) {
+        return res
+          .status(404)
+          .json({
+            success: false,
+            error: `Base branch not found: ${baseBranch}`,
+          });
+      }
+
+      // 2) Create a feature branch
+      const featureBranch = `deploy-update-${applicationName.replace(
+        /\W+/g,
+        "-"
+      )}-${Date.now()}`;
+      await gh.post(`/repos/${owner}/${repoName}/git/refs`, {
+        ref: `refs/heads/${featureBranch}`,
+        sha: baseSha,
+      });
+
+      // 3) Find deploy.yml (common locations)
+      const candidatePaths = [
+        ".github/workflows/deploy.yml",
+        "deploy.yml",
+        ".github/workflows/deploy.yaml",
+        "deploy.yaml",
+      ];
+      let deployPath: string | null = null;
+      let fileSha: string | null = null;
+      let fileContent: string | null = null;
+
+      for (const p of candidatePaths) {
+        try {
+          const c = await gh.get(
+            `/repos/${owner}/${repoName}/contents/${encodeURI(
+              p
+            )}?ref=${featureBranch}`
+          );
+          const data = c.data;
+          if (data && data.content) {
+            const decoded = Buffer.from(
+              data.content,
+              data.encoding || "base64"
+            ).toString("utf-8");
+            deployPath = p;
+            fileSha = data.sha;
+            fileContent = decoded;
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (!deployPath || !fileContent) {
+        return res
+          .status(404)
+          .json({
+            success: false,
+            error: "deploy.yml not found in repository",
+          });
+      }
+
+      // 4) Update YAML: ensure hosts/application entry exists and update fields
+      let doc: any;
+      try {
+        doc = yaml.load(fileContent) as any;
+      } catch (e: any) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: `Invalid YAML in ${deployPath}: ${e?.message || e}`,
+          });
+      }
+
+      // We expect structure like: hosts: [{ application: string, remote_user, hostname, deploy_path, branch, composer_options, npm_build }]
+      if (!doc.hosts) doc.hosts = [];
+      if (!Array.isArray(doc.hosts)) doc.hosts = [doc.hosts];
+
+      const appIndex = doc.hosts.findIndex((h: any) => {
+        const name = h?.application || h?.name || h?.app;
+        return (
+          typeof name === "string" && name.trim() === applicationName.trim()
+        );
+      });
+
+      const hostEntry = {
+        application: applicationName,
+        remote_user: username,
+        hostname: host,
+        deploy_path: sshPath,
+        branch: baseBranch,
+        composer_options:
+          "--no-dev --optimize-autoloader --prefer-dist --no-interaction --ignore-platform-reqs",
+        npm_build: "build",
+      };
+
+      if (appIndex >= 0) {
+        doc.hosts[appIndex] = { ...doc.hosts[appIndex], ...hostEntry };
+      } else {
+        doc.hosts.push(hostEntry);
+      }
+
+      const newYaml = yaml.dump(doc, { lineWidth: 120 });
+
+      // 5) Commit the change to feature branch via Contents API
+      const putResp = await gh.put(
+        `/repos/${owner}/${repoName}/contents/${encodeURI(deployPath)}`,
+        {
+          message: `chore: update deploy.yml for ${applicationName}`,
+          content: Buffer.from(newYaml, "utf-8").toString("base64"),
+          sha: fileSha,
+          branch: featureBranch,
+        }
+      );
+
+      // 6) Create a PR to the base branch
+      const prTitle = `Update deploy.yml for ${applicationName}`;
+      const prResp = await gh.post(`/repos/${owner}/${repoName}/pulls`, {
+        title: prTitle,
+        head: featureBranch,
+        base: baseBranch,
+        body: `This PR updates deploy.yml to configure deployment for ${applicationName}.`,
+      });
+
+      // 7) Log the step with branch info
+      await addApplicationStep(
+        app.id,
+        "deploy-workflow-update",
+        "success",
+        JSON.stringify({
+          repository: `${owner}/${repoName}`,
+          baseBranch,
+          featureBranch,
+          deployPath,
+          commit: putResp.data?.commit?.sha,
+          prNumber: prResp.data?.number,
+          duration: Date.now() - startTime,
+        })
+      );
+
+      return res.json({
+        success: true,
+        message: "deploy.yml updated and PR created",
+        data: {
+          repository: `${owner}/${repoName}`,
+          baseBranch,
+          featureBranch,
+          deployPath,
+          prNumber: prResp.data?.number,
+        },
+      });
+    } catch (error: any) {
+      const details = (() => {
+        try {
+          const base: any = { message: error?.message || String(error) };
+          if (error?.response?.status) base.status = error.response.status;
+          if (error?.response?.data) base.data = error.response.data;
+          if (error?.response?.headers) base.headers = error.response.headers;
+          if (error?.stack) base.stack = error.stack;
+          return base;
+        } catch (_) {
+          return { message: error?.message || String(error) };
+        }
+      })();
+
+      try {
+        const { host, username, applicationName } = req.body || {};
+        const app =
+          host && username && applicationName
+            ? await getApplicationByName(host, username, applicationName)
+            : null;
+        if (app?.id) {
+          await addApplicationStep(
+            app.id,
+            "deploy-workflow-update",
+            "failed",
+            JSON.stringify({ error: details, duration: Date.now() - startTime })
+          );
+        }
+      } catch (_) {}
+
+      return res.status(500).json({ success: false, error: details });
+    }
+  }
+);

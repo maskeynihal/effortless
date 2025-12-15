@@ -1,6 +1,7 @@
 import inquirer from "inquirer";
 import axios from "axios";
 import * as fs from "fs";
+import * as yaml from "js-yaml";
 import {
   initializeDatabase,
   closeDatabase,
@@ -349,6 +350,10 @@ class EffortlessCLI {
             { name: "Setup environment (.env)", value: "env" },
             { name: "Update .env with database config", value: "env-update" },
             { name: "Setup SSH key for GitHub Actions", value: "ssh-key" },
+            {
+              name: "Update deploy.yml and open PR",
+              value: "deploy-workflow-update",
+            },
             { name: "View step logs", value: "logs" },
             { name: "Exit", value: "exit" },
           ],
@@ -373,6 +378,9 @@ class EffortlessCLI {
           break;
         case "ssh-key":
           await this.runSSHKeySetup();
+          break;
+        case "deploy-workflow-update":
+          await this.runDeployWorkflowUpdate();
           break;
         case "logs":
           await this.showLogs();
@@ -795,6 +803,200 @@ class EffortlessCLI {
       console.table(response.data.steps || []);
     } catch (error: any) {
       console.error(`Failed to fetch logs: ${this.describeAxiosError(error)}`);
+    }
+    console.log("");
+  }
+
+  private async runDeployWorkflowUpdate(): Promise<void> {
+    if (!this.config || !this.config.githubToken) {
+      console.error("❌ GitHub token required for this operation");
+      return;
+    }
+
+    // Determine repository
+    let repo: string | undefined = this.config.selectedRepo;
+    if (!repo) {
+      const repos = await this.fetchGitHubRepos();
+      if (repos.length > 0) {
+        const { repoChoice } = await inquirer.prompt([
+          {
+            type: "list",
+            name: "repoChoice",
+            message: "Select repository to update deploy workflow:",
+            choices: [
+              ...repos.map((r) => ({ name: r, value: r })),
+              { name: "Enter owner/repo manually", value: "__manual__" },
+            ],
+            pageSize: 15,
+            default: this.config.selectedRepo || undefined,
+          },
+        ]);
+        if (repoChoice !== "__manual__") {
+          repo = repoChoice as string;
+        }
+      }
+      if (!repo) {
+        const manual = await inquirer.prompt([
+          {
+            type: "input",
+            name: "repo",
+            message: "Repository (owner/repo or GitHub URL):",
+            validate: (v) =>
+              v && v.includes("/") ? true : "Provide owner/repo",
+          },
+        ]);
+        repo = manual.repo;
+      }
+    }
+
+    // Parse repo to owner/repo
+    const repoMatch = repo?.match(
+      /(?:https:\/\/github\.com\/)?([^\/]+)\/(.+?)(?:\.git)?$/
+    );
+    if (!repoMatch) {
+      console.error("❌ Invalid repository format");
+      return;
+    }
+    const [, owner, repoName] = repoMatch;
+
+    // Prompt for base branch, SSH path used by actions
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "baseBranch",
+        message: "Base branch to open PR against:",
+        default: "main",
+      },
+      {
+        type: "input",
+        name: "sshPath",
+        message: "SSH private key file path (on server) to authorize:",
+        default: `/home/${this.config.username}/.ssh/id_ed25519`,
+      },
+    ]);
+
+    console.log("\n⏳ Updating deploy.yml and creating PR...\n");
+    try {
+      const headers = {
+        Authorization: `Bearer ${this.config.githubToken}`,
+        Accept: "application/vnd.github+json",
+      };
+
+      // 1. Get base branch SHA
+      console.log(`📍 Fetching base branch (${answers.baseBranch}) info...`);
+      const branchRes = await axios.get(
+        `https://api.github.com/repos/${owner}/${repoName}/branches/${answers.baseBranch}`,
+        { headers }
+      );
+      const baseSha = branchRes.data.commit.sha;
+      console.log(`✓ Base branch SHA: ${baseSha}`);
+
+      // 2. Create feature branch
+      const featureBranch = `deploy-${
+        this.config.applicationName
+      }-${Date.now()}`;
+      console.log(`📍 Creating feature branch (${featureBranch})...`);
+      const createRefRes = await axios.post(
+        `https://api.github.com/repos/${owner}/${repoName}/git/refs`,
+        {
+          ref: `refs/heads/${featureBranch}`,
+          sha: baseSha,
+        },
+        { headers }
+      );
+      console.log(`✓ Feature branch created`);
+
+      // 3. Fetch deploy.yml/deploy.yaml
+      console.log(`📍 Fetching deploy.yml...`);
+      let deployYamlPath = "deploy.yml";
+      let deployYamlRes: any;
+      try {
+        deployYamlRes = await axios.get(
+          `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yml?ref=${featureBranch}`,
+          { headers }
+        );
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          deployYamlPath = "deploy.yaml";
+          deployYamlRes = await axios.get(
+            `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yaml?ref=${featureBranch}`,
+            { headers }
+          );
+        } else {
+          throw err;
+        }
+      }
+      const currentContent = Buffer.from(
+        deployYamlRes.data.content,
+        "base64"
+      ).toString("utf8");
+      const fileSha = deployYamlRes.data.sha;
+      console.log(`✓ Deploy YAML found at: ${deployYamlPath}`);
+
+      // 4. Update YAML content
+      console.log(`📍 Updating YAML for ${this.config.applicationName}...`);
+      let parsed: any = yaml.load(currentContent) || {};
+      if (!parsed.hosts) parsed.hosts = {};
+      parsed.hosts[this.config.applicationName] = {
+        remote_user: this.config.username,
+        hostname: this.config.host,
+        deploy_path: this.config.pathname,
+        branch: answers.baseBranch,
+        composer_options: "--no-dev --optimize-autoloader",
+        npm_build: true,
+      };
+      const updatedContent = yaml.dump(parsed);
+      console.log(`✓ YAML updated`);
+
+      // 5. Commit to feature branch
+      console.log(`📍 Committing changes...`);
+      const commitRes = await axios.put(
+        `https://api.github.com/repos/${owner}/${repoName}/contents/${deployYamlPath}`,
+        {
+          message: `Update deploy config for ${this.config.applicationName}`,
+          content: Buffer.from(updatedContent).toString("base64"),
+          branch: featureBranch,
+          sha: fileSha,
+        },
+        { headers }
+      );
+      const commitSha = commitRes.data.commit.sha;
+      console.log(`✓ Commit SHA: ${commitSha}`);
+
+      // 6. Create PR
+      console.log(`📍 Creating pull request...`);
+      const prRes = await axios.post(
+        `https://api.github.com/repos/${owner}/${repoName}/pulls`,
+        {
+          title: `Deploy: Update config for ${this.config.applicationName}`,
+          body: `Automatically updated deploy configuration for **${this.config.applicationName}**\n\n- **Host**: ${this.config.host}\n- **SSH Path**: ${answers.sshPath}\n- **Path**: ${this.config.pathname}\n- **Branch**: ${answers.baseBranch}`,
+          head: featureBranch,
+          base: answers.baseBranch,
+        },
+        { headers }
+      );
+      const prNumber = prRes.data.number;
+      const prUrl = prRes.data.html_url;
+      console.log(`✓ PR created: ${prUrl}`);
+
+      console.log("\n✅ Workflow updated and pull request created");
+      console.log(`\n📋 Details:`);
+      console.log(`  Branch: ${featureBranch}`);
+      console.log(`  File: ${deployYamlPath}`);
+      console.log(`  PR #: ${prNumber}`);
+      console.log(`  URL: ${prUrl}`);
+    } catch (error: any) {
+      console.error(`\n❌ Update failed`);
+      if (axios.isAxiosError(error)) {
+        console.error(`\n📌 HTTP Status: ${error.response?.status}`);
+        console.error(`\n📄 Response Data:`);
+        console.error(JSON.stringify(error.response?.data, null, 2));
+        console.error(`\n📋 Headers:`);
+        console.error(JSON.stringify(error.response?.headers, null, 2));
+      }
+      console.error(`\n❌ Error Message: ${error.message}`);
+      console.error(`\n📚 Stack Trace:`);
+      console.error(error.stack);
     }
     console.log("");
   }
