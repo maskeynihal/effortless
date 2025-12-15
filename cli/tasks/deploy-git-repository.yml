@@ -8,6 +8,8 @@
 - name: Install deployer
   shell: |
     cd ~/{{ git_repository|splitext|first|split(':')|last }}
+    sudo update-alternatives --set php /usr/bin/php{{ php_version }}
+    php -v
     composer require --dev deployer/deployer
 
 - name: Copy deploy.yaml

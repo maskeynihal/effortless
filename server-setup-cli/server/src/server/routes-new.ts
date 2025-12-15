@@ -11,6 +11,10 @@ import {
   getApplicationSteps,
   updateApplicationStatus,
 } from "../shared/database";
+import { SSHConnectionStep } from "../steps/sshConnectionStep";
+import { GitHubAuthStep } from "../steps/githubAuthStep";
+import { RepoSelectionStep } from "../steps/repoSelectionStep";
+import { DeployKeyGenerationStep } from "../steps/deployKeyGenerationStep";
 
 const router = express.Router();
 
@@ -111,8 +115,8 @@ router.post("/connection/verify", async (req: Request, res: Response) => {
       }
     }
 
-    // Save application with connection details
-    const applicationId = await saveApplication({
+    // Save application with connection details, then reload to capture id
+    await saveApplication({
       sessionId,
       host,
       username,
@@ -123,21 +127,32 @@ router.post("/connection/verify", async (req: Request, res: Response) => {
       applicationName,
     });
 
-    // Log the verification step
-    await addApplicationStep(
-      applicationId,
-      "connection-verify",
-      sshConnected && (!githubToken || githubConnected) ? "success" : "failed",
-      JSON.stringify({
-        ssh: { connected: sshConnected, error: sshError },
-        github: {
-          connected: githubConnected,
-          error: githubError,
-          username: githubUsername,
-        },
-        duration: Date.now() - startTime,
-      })
+    const application = await getApplicationByName(
+      host,
+      username,
+      applicationName
     );
+    const applicationId = application?.id;
+
+    // Log the verification step
+    if (applicationId) {
+      await addApplicationStep(
+        applicationId,
+        "connection-verify",
+        sshConnected && (!githubToken || githubConnected)
+          ? "success"
+          : "failed",
+        JSON.stringify({
+          ssh: { connected: sshConnected, error: sshError },
+          github: {
+            connected: githubConnected,
+            error: githubError,
+            username: githubUsername,
+          },
+          duration: Date.now() - startTime,
+        })
+      );
+    }
 
     res.json({
       success: sshConnected && (!githubToken || githubConnected),
@@ -174,9 +189,8 @@ router.post("/connection/verify", async (req: Request, res: Response) => {
  * Generate and register deploy key (can be re-executed)
  */
 router.post("/step/deploy-key", async (req: Request, res: Response) => {
-  const stepId = uuidv4();
   const startTime = Date.now();
-
+  let app;
   try {
     const { host, username, applicationName, selectedRepo } = req.body;
 
@@ -190,7 +204,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
 
     await ensureDatabaseInitialized();
 
-    const app = await getApplicationByName(host, username, applicationName);
+    app = await getApplicationByName(host, username, applicationName);
     if (!app) {
       return res.status(404).json({
         success: false,
@@ -198,123 +212,131 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
       });
     }
 
-    logger.info(`[DeployKey] Generating deploy key for ${selectedRepo}`);
-
-    // Connect to server
-    const ssh = new SSH2Client();
-    await new Promise<void>((resolve, reject) => {
-      ssh.on("ready", resolve);
-      ssh.on("error", reject);
-      ssh.connect({
-        host,
-        port: app.port || 22,
-        username,
-        privateKey: Buffer.from(app.sshPrivateKey),
-        readyTimeout: 30000,
+    if (!app.sshPrivateKey) {
+      return res.status(400).json({
+        success: false,
+        error: "SSH key not found. Please verify connection first.",
       });
-    });
+    }
 
-    // Generate SSH key on server
-    const keyName = `${applicationName}_deploy_key`;
-    const keyPath = `~/.ssh/${keyName}`;
-
-    const generateKeyCommand = `ssh-keygen -t ed25519 -f ${keyPath} -N "" -C "${applicationName}@${host}" <<< y`;
-
-    let publicKey = "";
-    await new Promise<void>((resolve, reject) => {
-      ssh.exec(generateKeyCommand, (err: any, stream: any) => {
-        if (err) return reject(err);
-        stream.on("close", () => resolve());
-        stream.on("error", reject);
+    if (!app.githubToken) {
+      return res.status(400).json({
+        success: false,
+        error: "GitHub token missing. Please authenticate GitHub first.",
       });
-    });
+    }
 
-    // Read public key
-    await new Promise<void>((resolve, reject) => {
-      ssh.exec(`cat ${keyPath}.pub`, (err: any, stream: any) => {
-        if (err) return reject(err);
-        stream.on("data", (data: Buffer) => {
-          publicKey += data.toString();
-        });
-        stream.on("close", () => resolve());
-        stream.on("error", reject);
-      });
-    });
-
-    ssh.end();
-
-    publicKey = publicKey.trim();
     logger.info(
-      `[DeployKey] Public key generated: ${publicKey.substring(0, 50)}...`
+      `[DeployKey] Generating deploy key for ${selectedRepo} (token present: ${!!app.githubToken})`
     );
 
-    // Register deploy key on GitHub
-    const [owner, repo] = selectedRepo.includes("/")
-      ? selectedRepo.split("/")
-      : selectedRepo.replace("https://github.com/", "").split("/");
+    // Build workflow-style steps to mirror routes.ts behavior
+    const sshStep = new SSHConnectionStep(
+      host,
+      username,
+      "",
+      app.port || 22,
+      app.sshPrivateKey
+    );
 
-    try {
-      const response = await axios.post(
-        `https://api.github.com/repos/${owner}/${repo}/keys`,
-        {
-          title: `Deploy key for ${applicationName} (${host})`,
-          key: publicKey,
-          read_only: false,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${app.githubToken}`,
-            Accept: "application/vnd.github.v3+json",
-          },
-        }
-      );
+    const githubStep = new GitHubAuthStep(app.githubToken);
+    const repoStep = new RepoSelectionStep(githubStep);
+    repoStep.setSelectedRepo(selectedRepo);
+    const deployStep = new DeployKeyGenerationStep(
+      sshStep,
+      githubStep,
+      repoStep,
+      applicationName,
+      host,
+      username
+    );
 
-      logger.info(`[DeployKey] Deploy key registered on GitHub`);
-
-      // Log success
-      await addApplicationStep(
-        app.id,
-        "deploy-key-generation",
-        "success",
-        JSON.stringify({
-          keyName,
-          repository: selectedRepo,
-          keyId: response.data.id,
-          duration: Date.now() - startTime,
-        })
-      );
-
-      res.json({
-        success: true,
-        message: "Deploy key generated and registered successfully",
-        data: {
-          keyName,
-          keyPath,
-          repository: selectedRepo,
-          keyId: response.data.id,
-        },
-      });
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message;
-      logger.error(`[DeployKey] Failed to register on GitHub: ${errorMsg}`);
-
+    // Ensure SSH connects first
+    const sshResult = await sshStep.execute();
+    if (!sshResult.success) {
       await addApplicationStep(
         app.id,
         "deploy-key-generation",
         "failed",
         JSON.stringify({
-          error: errorMsg,
+          error: sshResult.message,
           duration: Date.now() - startTime,
         })
       );
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        error: `Failed to register deploy key: ${errorMsg}`,
+        error: sshResult.message,
       });
     }
+
+    // Validate PAT before proceeding
+    const authResult = await githubStep.execute();
+    if (!authResult.success) {
+      sshStep.closeConnection();
+      await addApplicationStep(
+        app.id,
+        "deploy-key-generation",
+        "failed",
+        JSON.stringify({
+          error: authResult.message,
+          duration: Date.now() - startTime,
+        })
+      );
+      return res.status(400).json({
+        success: false,
+        error: authResult.message,
+      });
+    }
+
+    // Execute deploy key step
+    const result = await deployStep.execute();
+    sshStep.closeConnection();
+
+    if (result.success) {
+      await addApplicationStep(
+        app.id,
+        "deploy-key-generation",
+        "success",
+        JSON.stringify({
+          repository: selectedRepo,
+          deployKeyName: result.data?.deployKeyName,
+          duration: result.data?.duration || Date.now() - startTime,
+        })
+      );
+      return res.json({
+        success: true,
+        message: result.message,
+        data: result.data,
+      });
+    }
+
+    await addApplicationStep(
+      app.id,
+      "deploy-key-generation",
+      "failed",
+      JSON.stringify({
+        error: result.message,
+        duration: result.data?.duration || Date.now() - startTime,
+      })
+    );
+
+    return res.status(500).json({ success: false, error: result.message });
   } catch (error: any) {
     logger.error(`[DeployKey] Step failed: ${error.message}`);
+
+    if (app?.id) {
+      await addApplicationStep(
+        app.id,
+        "deploy-key-generation",
+        "failed",
+        JSON.stringify({
+          error: error.message,
+          duration: Date.now() - startTime,
+        })
+      );
+    }
+
     res.status(500).json({
       success: false,
       error: error.message,

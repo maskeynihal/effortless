@@ -1,6 +1,15 @@
 import inquirer from "inquirer";
 import axios from "axios";
 import * as fs from "fs";
+import {
+  initializeDatabase,
+  closeDatabase,
+  getApplicationsByHostUser,
+  getSessionByApplication,
+  getDistinctConfigurations,
+  saveApplication,
+} from "../shared/database";
+import { v4 as uuidv4 } from "uuid";
 
 const API_URL = process.env.API_URL || "http://localhost:3000/api";
 
@@ -13,16 +22,24 @@ interface CLIConfig {
   applicationName: string;
   githubToken?: string;
   selectedRepo?: string;
+  domain?: string;
+  pathname?: string;
 }
 
 class EffortlessCLI {
   private config: CLIConfig | null = null;
   private sessionId: string | null = null;
+  private preHost?: string;
+  private preUsername?: string;
+  private preApplicationName?: string;
+  private prePort?: number;
 
   async start(): Promise<void> {
     try {
       console.log("\n🚀 Effortless CLI (step-based)\n");
-      await this.gatherConfig();
+      await initializeDatabase();
+      await this.preselectApplication();
+      await this.collectAndStoreConfiguration();
       await this.verifyConnections();
       await this.runMenu();
       console.log(
@@ -31,69 +48,247 @@ class EffortlessCLI {
     } catch (error: any) {
       console.error(`\n❌ Error: ${error.message || error}\n`);
       process.exit(1);
+    } finally {
+      await closeDatabase();
     }
   }
 
-  private async gatherConfig(): Promise<void> {
-    const answers = await inquirer.prompt([
-      {
-        type: "input",
-        name: "host",
-        message: "Server host (IP or domain):",
-        validate: (v) => (!!v ? true : "Host is required"),
-      },
-      {
-        type: "input",
-        name: "username",
-        message: "SSH username:",
-        default: "root",
-      },
-      {
+  // List all previously stored applications across hosts/users, allow selection or create new
+  private async preselectApplication(): Promise<void> {
+    try {
+      const configs = await getDistinctConfigurations();
+      const appChoices: Array<{ name: string; value: string }> = [];
+
+      for (const cfg of configs) {
+        const apps = await getApplicationsByHostUser(cfg.host, cfg.username);
+        for (const app of apps) {
+          appChoices.push({
+            name: `${app.applicationName} — ${cfg.username}@${cfg.host}:${
+              cfg.port
+            }${app.selectedRepo ? ` (${app.selectedRepo})` : ""}`,
+            value: JSON.stringify({
+              host: cfg.host,
+              username: cfg.username,
+              port: cfg.port,
+              applicationName: app.applicationName,
+            }),
+          });
+        }
+      }
+
+      const choices = [
+        ...appChoices,
+        { name: "➕ Create new application", value: "__NEW__" },
+      ];
+
+      const { selection } = await inquirer.prompt([
+        {
+          type: "list",
+          name: "selection",
+          message:
+            appChoices.length > 0
+              ? "Select an application to continue or create new:"
+              : "No applications found. Create new:",
+          choices,
+          pageSize: 15,
+        },
+      ]);
+
+      if (selection !== "__NEW__") {
+        const parsed = JSON.parse(selection);
+        this.preHost = parsed.host;
+        this.preUsername = parsed.username;
+        this.prePort = parsed.port;
+        this.preApplicationName = parsed.applicationName;
+      }
+    } catch (_) {
+      // If listing fails, proceed to normal prompts
+    }
+  }
+  // Step 1 & 2: prompt info and store in DB first
+  private async collectAndStoreConfiguration(): Promise<void> {
+    // If an application was preselected, use that server directly
+    const useExisting = !!(this.preHost && this.preUsername);
+
+    const questions: any[] = [];
+    if (!useExisting) {
+      questions.push(
+        {
+          type: "input",
+          name: "host",
+          message: "Server host (IP or domain):",
+          validate: (v: string) => (!!v ? true : "Host is required"),
+          default: this.preHost || undefined,
+        },
+        {
+          type: "input",
+          name: "username",
+          message: "SSH username:",
+          default: this.preUsername || "root",
+        },
+        {
+          type: "input",
+          name: "port",
+          message: "SSH port:",
+          default: String(this.prePort ?? 22),
+          validate: (v: string) =>
+            !v || isNaN(Number(v)) ? "Port must be a number" : true,
+        }
+      );
+    } else if (this.prePort == null) {
+      // If using existing but port wasn't known, ask for it
+      questions.push({
         type: "input",
         name: "port",
         message: "SSH port:",
         default: "22",
-        validate: (v) =>
+        validate: (v: string) =>
           !v || isNaN(Number(v)) ? "Port must be a number" : true,
-      },
-      {
-        type: "input",
-        name: "privateKeyPath",
-        message: "Path to SSH private key:",
-        default: "~/.ssh/id_ed25519",
-      },
-      {
-        type: "input",
-        name: "applicationName",
-        message: "Application name:",
-        validate: (v) => (!!v ? true : "Application name is required"),
-      },
-      {
-        type: "password",
-        name: "githubToken",
-        message: "GitHub PAT (optional, for private repos):",
-        mask: "*",
-      },
-    ]);
-
-    const expandedKeyPath = answers.privateKeyPath.replace(
-      "~",
-      process.env.HOME || ""
-    );
-    if (!fs.existsSync(expandedKeyPath)) {
-      throw new Error(`Private key not found at ${expandedKeyPath}`);
+      });
     }
-    const privateKeyContent = fs.readFileSync(expandedKeyPath, "utf8");
+
+    // GitHub PAT is resolved later from env/stored, prompt only if missing
+
+    const answers = await inquirer.prompt(questions);
+    // Determine host/username after potential preselection
+    const host = useExisting ? (this.preHost as string) : answers.host;
+    const username = useExisting
+      ? (this.preUsername as string)
+      : answers.username;
+    const port = useExisting
+      ? this.prePort ?? (parseInt(answers.port, 10) || 22)
+      : parseInt(answers.port, 10) || 22;
+
+    // Determine applicationName: use preselected if available; else prompt to create new
+    let applicationName: string = this.preApplicationName || "";
+    let selectedRepo: string | undefined = undefined;
+    let storedGithubToken: string | undefined = undefined;
+    let sessionForApp: any | undefined = undefined;
+    let selectedApp: any | undefined = undefined;
+
+    if (!applicationName) {
+      const { appName } = await inquirer.prompt([
+        {
+          type: "input",
+          name: "appName",
+          message: "New application name:",
+          validate: (v) => (!!v ? true : "Application name is required"),
+        },
+      ]);
+      applicationName = appName;
+    }
+
+    // If preselected application (or existing record), load stored details for defaults
+    const existingApps = await getApplicationsByHostUser(host, username);
+    selectedApp = existingApps.find(
+      (app) => app.applicationName === applicationName
+    );
+    const session = await getSessionByApplication(
+      host,
+      username,
+      applicationName
+    );
+    if (session) {
+      selectedRepo = session.selectedRepo || undefined;
+      storedGithubToken = session.githubToken || undefined;
+      sessionForApp = session;
+    }
+
+    let domain: string | undefined = selectedApp?.domain || undefined;
+    let pathname: string | undefined = selectedApp?.pathname || undefined;
+    if (!domain || !pathname) {
+      const promptAns = await inquirer.prompt([
+        {
+          type: "input",
+          name: "domain",
+          message: "Application domain (e.g. example.com):",
+          default: domain || `${applicationName}.local`,
+        },
+        {
+          type: "input",
+          name: "pathname",
+          message: "Application path on server:",
+          default: pathname || `/var/www/${applicationName}`,
+        },
+      ]);
+      domain = promptAns.domain;
+      pathname = promptAns.pathname;
+    }
+
+    // Resolve private key: use stored if available, else prompt for path now
+    let privateKeyContent: string = "";
+    if (sessionForApp?.sshPrivateKey) {
+      privateKeyContent = sessionForApp.sshPrivateKey;
+    } else {
+      const keyAns = await inquirer.prompt([
+        {
+          type: "input",
+          name: "privateKeyPath",
+          message: "Path to SSH private key:",
+          default: "~/.ssh/id_ed25519",
+        },
+      ]);
+      const expandedKeyPath = keyAns.privateKeyPath.replace(
+        "~",
+        process.env.HOME || ""
+      );
+      if (!fs.existsSync(expandedKeyPath)) {
+        throw new Error(`Private key not found at ${expandedKeyPath}`);
+      }
+      privateKeyContent = fs.readFileSync(expandedKeyPath, "utf8");
+    }
+
+    // Resolve GitHub PAT: prefer stored, then env, then prompt
+    let githubToken: string | undefined = storedGithubToken;
+    if (!githubToken) {
+      githubToken =
+        process.env.GH_TOKEN ||
+        process.env.GH_TOKEN_TECHNORIO_GITHUB ||
+        undefined;
+    }
+    if (!githubToken) {
+      const ghAns = await inquirer.prompt([
+        {
+          type: "password",
+          name: "githubToken",
+          message: "GitHub PAT (optional, for private repos):",
+          mask: "*",
+        },
+      ]);
+      githubToken = ghAns.githubToken || undefined;
+    }
 
     this.config = {
-      host: answers.host,
-      username: answers.username,
-      port: parseInt(answers.port, 10) || 22,
-      privateKeyPath: expandedKeyPath,
+      host,
+      username,
+      port,
+      privateKeyPath: "",
       privateKeyContent,
-      applicationName: answers.applicationName,
-      githubToken: answers.githubToken || undefined,
+      applicationName,
+      githubToken,
+      selectedRepo,
+      domain,
+      pathname,
     };
+
+    // Persist application configuration before verification
+    if (!this.sessionId) {
+      this.sessionId = uuidv4();
+    }
+    await saveApplication({
+      sessionId: this.sessionId,
+      host,
+      username,
+      port,
+      sshKeyName: undefined,
+      githubUsername: undefined,
+      sshPrivateKey: privateKeyContent,
+      githubToken,
+      applicationName,
+      selectedRepo,
+      domain,
+      pathname,
+    });
   }
 
   private async verifyConnections(): Promise<void> {
@@ -108,6 +303,8 @@ class EffortlessCLI {
         port: this.config.port,
         githubToken: this.config.githubToken,
         applicationName: this.config.applicationName,
+        domain: this.config.domain,
+        pathname: this.config.pathname,
       });
 
       if (!response.data.success) {
@@ -318,9 +515,13 @@ class EffortlessCLI {
         type: "input",
         name: "pathname",
         message: "Folder path on server:",
-        default: `/var/www/${this.config.applicationName}`,
+        default:
+          this.config.pathname || `/var/www/${this.config.applicationName}`,
       },
     ]);
+
+    // Keep config in sync for subsequent steps
+    this.config.pathname = pathname;
 
     console.log("\n⏳ Creating folder...\n");
     try {

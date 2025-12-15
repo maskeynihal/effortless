@@ -63,7 +63,7 @@ export async function saveApplication(applicationData: {
   selectedRepo?: string;
   domain?: string;
   pathname?: string;
-}): Promise<number> {
+}): Promise<{ id: number }> {
   const db = getDb();
   const {
     sessionId,
@@ -96,10 +96,13 @@ export async function saveApplication(applicationData: {
       pathname: pathname || null,
       status: "pending",
     })
+    .returning("id")
     .onConflict(["host", "username", "applicationName"])
     .merge();
 
-  logger.debug(`Application saved: ${applicationName} (${sessionId})`);
+  logger.info(`Application saved: ${applicationName} (${sessionId})`);
+
+  console.log({ result });
   return result[0];
 }
 
