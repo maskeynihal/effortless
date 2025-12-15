@@ -32,6 +32,7 @@ app.get("/", (req, res) => {
       deployKey: "POST /api/step/deploy-key",
       createDatabase: "POST /api/step/database-create",
       setupFolder: "POST /api/step/folder-setup",
+      setupEnv: "POST /api/step/env-setup",
       getSteps: "GET /api/steps/:host/:username/:applicationName",
     },
   });
@@ -67,6 +68,7 @@ app.listen(PORT, () => {
   logger.info("  POST   /api/step/deploy-key");
   logger.info("  POST   /api/step/database-create");
   logger.info("  POST   /api/step/folder-setup");
+  logger.info("  POST   /api/step/env-setup");
   logger.info("  GET    /api/steps/:host/:username/:applicationName");
 });
 

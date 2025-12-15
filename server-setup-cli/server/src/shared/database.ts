@@ -102,7 +102,6 @@ export async function saveApplication(applicationData: {
 
   logger.info(`Application saved: ${applicationName} (${sessionId})`);
 
-  console.log({ result });
   return result[0];
 }
 

@@ -346,6 +346,8 @@ class EffortlessCLI {
             { name: "Generate & register deploy key", value: "deploy" },
             { name: "Create database", value: "db" },
             { name: "Setup application folder", value: "folder" },
+            { name: "Setup environment (.env)", value: "env" },
+            { name: "Update .env with database config", value: "env-update" },
             { name: "View step logs", value: "logs" },
             { name: "Exit", value: "exit" },
           ],
@@ -361,6 +363,12 @@ class EffortlessCLI {
           break;
         case "folder":
           await this.runFolderSetup();
+          break;
+        case "env":
+          await this.runEnvSetup();
+          break;
+        case "env-update":
+          await this.runEnvUpdate();
           break;
         case "logs":
           await this.showLogs();
@@ -542,6 +550,146 @@ class EffortlessCLI {
       console.error(
         `❌ Folder setup failed: ${this.describeAxiosError(error)}`
       );
+    }
+    console.log("");
+  }
+
+  private async runEnvSetup(): Promise<void> {
+    if (!this.config) return;
+
+    // Ensure we know the path where to place .env
+    const { pathname } = await inquirer.prompt([
+      {
+        type: "input",
+        name: "pathname",
+        message: "Application path on server (will use <path>/shared/.env):",
+        default:
+          this.config.pathname || `/var/www/${this.config.applicationName}`,
+      },
+    ]);
+    this.config.pathname = pathname;
+
+    // Resolve repository: prefer existing selection, else offer picklist/prompt
+    let repo: string | undefined = this.config.selectedRepo;
+    if (!repo) {
+      let choice: string | undefined;
+      const repos = await this.fetchGitHubRepos();
+      if (repos.length > 0) {
+        const ans = await inquirer.prompt([
+          {
+            type: "list",
+            name: "repoChoice",
+            message: "Select the repository to fetch .env.example from:",
+            choices: [
+              ...repos.map((r) => ({ name: r, value: r })),
+              { name: "Enter owner/repo manually", value: "__manual__" },
+            ],
+            pageSize: 15,
+          },
+        ]);
+        choice = ans.repoChoice;
+      }
+      if (!choice || choice === "__manual__") {
+        const manual = await inquirer.prompt([
+          {
+            type: "input",
+            name: "repo",
+            message: "Repository (owner/repo or GitHub URL):",
+            validate: (v) =>
+              v && v.includes("/") ? true : "Provide owner/repo",
+          },
+        ]);
+        repo = manual.repo;
+      } else {
+        repo = choice;
+      }
+    }
+
+    console.log("\n⏳ Setting up .env from repository...\n");
+    try {
+      const response = await axios.post(`${API_URL}/step/env-setup`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        pathname,
+        selectedRepo: repo,
+      });
+
+      if (response.data.success) {
+        console.log("✅ .env created");
+        console.table(response.data.data || {});
+      } else {
+        console.error(`❌ Env setup failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(`❌ Env setup failed: ${this.describeAxiosError(error)}`);
+    }
+    console.log("");
+  }
+
+  private async runEnvUpdate(): Promise<void> {
+    if (!this.config) return;
+
+    const answers = await inquirer.prompt([
+      {
+        type: "list",
+        name: "dbType",
+        message: "Database type:",
+        choices: ["MySQL", "PostgreSQL"],
+        default: "MySQL",
+      },
+      {
+        type: "input",
+        name: "dbPort",
+        message: "Database port:",
+        default: (ans: any) => (ans.dbType === "MySQL" ? "3306" : "5432"),
+        validate: (v: string) =>
+          !isNaN(Number(v)) ? true : "Port must be a number",
+      },
+      {
+        type: "input",
+        name: "dbName",
+        message: "Database name:",
+        default: this.config.applicationName,
+      },
+      {
+        type: "input",
+        name: "dbUsername",
+        message: "Database username:",
+        default: `${this.config.applicationName}_user`,
+      },
+      {
+        type: "password",
+        name: "dbPassword",
+        message: "Database password:",
+        mask: "*",
+      },
+    ]);
+
+    console.log("\n⏳ Updating .env with database configuration...\n");
+    try {
+      const response = await axios.post(`${API_URL}/step/env-update`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        pathname: this.config.pathname,
+        dbType: answers.dbType,
+        dbPort: parseInt(answers.dbPort, 10),
+        dbName: answers.dbName,
+        dbUsername: answers.dbUsername,
+        dbPassword: answers.dbPassword,
+      });
+
+      if (response.data.success) {
+        console.log("✅ .env updated with database configuration");
+        console.table(response.data.data?.updates || {});
+        console.log("\nVerification (DB_* keys):");
+        console.log(response.data.data?.verification || "");
+      } else {
+        console.error(`❌ Env update failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(`❌ Env update failed: ${this.describeAxiosError(error)}`);
     }
     console.log("");
   }

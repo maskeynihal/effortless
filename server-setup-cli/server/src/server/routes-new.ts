@@ -534,28 +534,88 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
       });
     });
 
-    // Create folder
-    await new Promise<void>((resolve, reject) => {
-      ssh.exec(`sudo -n mkdir -p ${pathname}`, (err: any, stream: any) => {
-        if (err) return reject(err);
-        if (stream.stdin) stream.stdin.end();
-        stream.on("close", () => resolve());
-        stream.on("error", reject);
-      });
-    });
+    // Helper to run commands with timeout
+    const execWithTimeout = (
+      cmd: string,
+      label: string,
+      timeoutMs: number = 15000
+    ): Promise<{ code: number; stdout: string; stderr: string }> => {
+      return new Promise((resolve, reject) => {
+        let stdout = "";
+        let stderr = "";
+        let finished = false;
+        const timer = setTimeout(() => {
+          if (finished) return;
+          finished = true;
+          logger.error(`[Folder] Timeout (${timeoutMs}ms) running ${label}`);
+          reject(new Error(`Timeout running ${label}`));
+        }, timeoutMs);
 
-    // Set ownership
-    await new Promise<void>((resolve, reject) => {
-      ssh.exec(
-        `sudo -n chown ${username}:${username} ${pathname}`,
-        (err: any, stream: any) => {
-          if (err) return reject(err);
-          if (stream.stdin) stream.stdin.end();
-          stream.on("close", () => resolve());
-          stream.on("error", reject);
-        }
-      );
-    });
+        ssh.exec(cmd, (err: any, stream: any) => {
+          if (err) {
+            clearTimeout(timer);
+            return reject(err);
+          }
+          if (stream?.stdin) stream.stdin.end();
+          stream?.on("data", (d: Buffer) => (stdout += d.toString()));
+          stream?.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+          stream?.on("close", (code: number) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            if (stdout.trim())
+              logger.debug(`[Folder] ${label} stdout: ${stdout.trim()}`);
+            if (stderr.trim())
+              logger.debug(`[Folder] ${label} stderr: ${stderr.trim()}`);
+            if (code !== 0) {
+              const errMsg = `${label} exited with ${code}${
+                stderr ? `: ${stderr.trim()}` : ""
+              }`;
+              logger.error(`[Folder] ${errMsg}`);
+              return reject(new Error(errMsg));
+            }
+            resolve({ code, stdout, stderr });
+          });
+          stream?.on("error", (e: any) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            reject(e);
+          });
+        });
+      });
+    };
+
+    // Pre-check sudo -n to avoid hangs
+    logger.info(`[Folder] Checking sudo access`);
+    try {
+      await execWithTimeout(`sudo -n true`, "sudo check", 5000);
+    } catch (e: any) {
+      ssh.end();
+      logger.error(`[Folder] sudo -n not permitted: ${e.message}`);
+      return res.status(400).json({
+        success: false,
+        error:
+          "sudo -n not permitted. Configure NOPASSWD for mkdir, chown, and chmod commands on the target path.",
+        details: e.message,
+      });
+    }
+
+    // Create folder
+    logger.info(`[Folder] Creating directory with sudo`);
+    await execWithTimeout(`sudo -n mkdir -p ${pathname}`, "mkdir", 10000);
+
+    // Set ownership recursively to ensure nested paths are accessible
+    logger.info(`[Folder] Setting ownership to ${username}:${username}`);
+    await execWithTimeout(
+      `sudo -n chown -R ${username}:${username} ${pathname}`,
+      "chown",
+      10000
+    );
+
+    // Set permissions to ensure write access
+    logger.info(`[Folder] Setting permissions to 755`);
+    await execWithTimeout(`sudo -n chmod -R 755 ${pathname}`, "chmod", 10000);
 
     ssh.end();
 
@@ -604,6 +664,671 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
     } catch (e) {}
 
     res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /step/env-setup
+ * Fetch .env.example from selected GitHub repo and write to server path/shared/.env
+ */
+router.post("/step/env-setup", async (req: Request, res: Response) => {
+  const startTime = Date.now();
+
+  try {
+    const { host, username, applicationName, pathname, selectedRepo } =
+      req.body;
+    logger.info(`[EnvSetup] Request received`, {
+      host,
+      username,
+      applicationName,
+      pathname,
+      selectedRepo,
+    });
+
+    if (!host || !username || !applicationName || !pathname) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Missing required fields: host, username, applicationName, pathname",
+      });
+    }
+
+    logger.info(`[EnvSetup] Ensuring database is initialized`);
+    await ensureDatabaseInitialized();
+
+    logger.info(
+      `[EnvSetup] Loading application record for ${username}@${host}:${applicationName}`
+    );
+    const app = await getApplicationByName(host, username, applicationName);
+    if (!app) {
+      return res.status(404).json({
+        success: false,
+        error: "Application not found. Please verify connection first.",
+      });
+    }
+
+    if (!app.sshPrivateKey) {
+      return res.status(400).json({
+        success: false,
+        error: "SSH key not found. Please verify connection first.",
+      });
+    }
+
+    const repo: string | undefined =
+      selectedRepo || app.selectedRepo || undefined;
+    logger.info(`[EnvSetup] Using repository`, { repo });
+    if (!repo) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Repository not set. Provide 'selectedRepo' or run deploy key step to store one.",
+      });
+    }
+
+    // Parse repo owner/name from either owner/repo or full URL
+    let owner: string;
+    let repoName: string;
+    const slashCount = (repo.match(/\//g) || []).length;
+    if (slashCount === 1 && !repo.startsWith("http")) {
+      [owner, repoName] = repo.split("/");
+    } else {
+      const m = repo.match(
+        /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/
+      );
+      if (!m) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid repository format. Use owner/repo or GitHub URL.",
+        });
+      }
+      owner = m[1];
+      repoName = m[2];
+    }
+
+    // Helper that fetches .env.example content using GitHub API
+    const fetchEnvExample = async (): Promise<string | null> => {
+      logger.info(`[EnvSetup] Fetching .env.example from ${owner}/${repoName}`);
+      const token: string | undefined = app.githubToken || undefined;
+      const baseHeaders: Record<string, string> = {
+        Accept: "application/vnd.github.raw+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      };
+      if (token) {
+        baseHeaders["Authorization"] = `Bearer ${token}`;
+        logger.info(
+          `[EnvSetup] GitHub token present; using authenticated requests`
+        );
+      } else {
+        logger.info(
+          `[EnvSetup] No GitHub token present; attempting public raw fetch as fallback`
+        );
+      }
+
+      const branches = ["main", "master"];
+      const candidatePaths = [
+        ".env.example",
+        "env.example",
+        "example.env",
+        "config/.env.example",
+      ];
+
+      // Strategy 1: GitHub Contents API with ref and raw accept
+      for (const ref of branches) {
+        for (const p of candidatePaths) {
+          const apiUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURI(
+            p
+          )}`;
+          try {
+            logger.info(`[EnvSetup] Contents API try: ref=${ref} path=${p}`);
+            const r = await axios.get(apiUrl, {
+              headers: baseHeaders,
+              timeout: 15000,
+            });
+            if (r.status === 200 && typeof r.data === "string") {
+              logger.info(
+                `[EnvSetup] Found .env.example via Contents API at ${p} (ref ${ref})`
+              );
+              return r.data as string;
+            }
+          } catch (e: any) {
+            const status = e?.response?.status;
+            if (status && status !== 404) {
+              logger.debug(
+                `[EnvSetup] Contents API error ${status} for ${apiUrl}`
+              );
+            }
+          }
+        }
+      }
+
+      // Strategy 2: Raw URLs (works for public repos)
+      for (const ref of branches) {
+        for (const p of candidatePaths) {
+          const rawUrl = `https://raw.githubusercontent.com/${owner}/${repoName}/${ref}/${p}`;
+          try {
+            logger.info(`[EnvSetup] Raw try: ${rawUrl}`);
+            const r = await axios.get(rawUrl, { timeout: 12000 });
+            if (typeof r.data === "string") return r.data as string;
+          } catch (_) {}
+        }
+      }
+
+      return null;
+    };
+
+    logger.info(`[EnvSetup] Starting .env.example fetch`);
+    const envContent = await fetchEnvExample();
+    if (!envContent) {
+      logger.warn(`[EnvSetup] .env.example not found in ${owner}/${repoName}`);
+      return res.status(400).json({
+        success: false,
+        error:
+          ".env.example not found in the repository (checked main/master and common paths).",
+      });
+    }
+    logger.info(
+      `[EnvSetup] .env.example fetched successfully (${envContent.length} bytes)`
+    );
+
+    // Connect to server and write file to <pathname>/shared/.env
+    const ssh = new SSH2Client();
+    logger.info(
+      `[EnvSetup] Establishing SSH connection to ${username}@${host}`
+    );
+    await new Promise<void>((resolve, reject) => {
+      ssh.on("ready", resolve);
+      ssh.on("error", reject);
+      ssh.connect({
+        host,
+        port: app.port || 22,
+        username,
+        privateKey: Buffer.from(app.sshPrivateKey),
+        readyTimeout: 30000,
+      });
+    });
+    logger.info(`[EnvSetup] SSH connection established`);
+
+    const sharedDir = `${pathname}/shared`;
+    const envPath = `${sharedDir}/.env`;
+
+    // Helper to run remote commands with timeout and logging to avoid hangs
+    const execWithTimeout = (
+      cmd: string,
+      label: string,
+      timeoutMs: number = 15000,
+      allowNonZero: boolean = true
+    ): Promise<{ code: number; stdout: string; stderr: string }> => {
+      return new Promise((resolve, reject) => {
+        let stdout = "";
+        let stderr = "";
+        let finished = false;
+        const timer = setTimeout(() => {
+          if (finished) return;
+          finished = true;
+          logger.error(`[EnvSetup] Timeout (${timeoutMs}ms) running ${label}`);
+          reject(new Error(`Timeout running ${label}`));
+        }, timeoutMs);
+
+        ssh.exec(cmd, (err: any, stream: any) => {
+          if (err) {
+            clearTimeout(timer);
+            return reject(err);
+          }
+          if (stream?.stdin) stream.stdin.end();
+          stream?.on("data", (d: Buffer) => (stdout += d.toString()));
+          stream?.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+          stream?.on("close", (code: number) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            if (stdout.trim())
+              logger.debug(`[EnvSetup] ${label} stdout: ${stdout.trim()}`);
+            if (stderr.trim())
+              logger.debug(`[EnvSetup] ${label} stderr: ${stderr.trim()}`);
+            if (!allowNonZero && code !== 0) {
+              const errMsg = `${label} exited with ${code}${
+                stderr ? `: ${stderr.trim()}` : ""
+              }`;
+              logger.error(`[EnvSetup] ${errMsg}`);
+              return reject(new Error(errMsg));
+            }
+            resolve({ code, stdout, stderr });
+          });
+          stream?.on("error", (e: any) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            reject(e);
+          });
+        });
+      });
+    };
+
+    // Ensure shared directory exists (quietly) using sudo -n; fail fast if sudo prompts
+    logger.info(
+      `[EnvSetup] Ensuring shared directory exists at ${sharedDir} using ACL`
+    );
+
+    // Pre-check sudo -n to avoid hangs
+    let sudoCheck: { ok: boolean; code: number; out: string; err: string } = {
+      ok: false,
+      code: 1,
+      out: "",
+      err: "",
+    };
+    try {
+      const result = await execWithTimeout(
+        `sudo -n true`,
+        "sudo check",
+        5000,
+        false
+      );
+      sudoCheck = {
+        ok: result.code === 0,
+        code: result.code,
+        out: result.stdout,
+        err: result.stderr,
+      };
+    } catch (e: any) {
+      sudoCheck = {
+        ok: false,
+        code: 1,
+        out: e?.stdout || "",
+        err: e?.stderr || e?.message || "",
+      };
+    }
+
+    if (!sudoCheck.ok) {
+      ssh.end();
+      logger.error(`[EnvSetup] sudo -n not permitted`, sudoCheck);
+      return res.status(400).json({
+        success: false,
+        error:
+          "sudo -n not permitted for required commands (setfacl/mkdir). Configure NOPASSWD for setfacl and mkdir on the target path, then retry.",
+        details: sudoCheck,
+      });
+    }
+
+    const aclCommands = [
+      `sudo -n setfacl -m u:${username}:rwx ${pathname} || true`,
+      `sudo -n setfacl -d -m u:${username}:rwx ${pathname} || true`,
+    ];
+
+    for (const cmd of aclCommands) {
+      await execWithTimeout(cmd, "ACL command", 10000, true);
+    }
+
+    // Create shared directory as the current SSH user (no sudo)
+    await execWithTimeout(
+      `mkdir -p ${sharedDir}`,
+      "mkdir sharedDir",
+      10000,
+      false
+    );
+
+    logger.info(`[EnvSetup] Writing .env to ${envPath} as SSH user`);
+    const heredoc = "EOF_ENV_SETUP";
+    // Write file without sudo to honor the requirement; ACLs above should grant access
+    await execWithTimeout(
+      `cat <<'${heredoc}' > ${envPath}\n${envContent}\n${heredoc}`,
+      "write .env",
+      15000,
+      false
+    );
+    logger.info(`[EnvSetup] .env write completed`);
+
+    // Verify
+    let verifyOutput = "";
+    logger.info(`[EnvSetup] Verifying .env presence at ${envPath}`);
+    await execWithTimeout(
+      `test -f ${envPath} && echo exists || echo missing`,
+      "verify .env",
+      8000,
+      true
+    ).then((res) => {
+      verifyOutput = res.stdout || "";
+    });
+
+    ssh.end();
+    logger.info(`[EnvSetup] SSH session closed`);
+
+    await addApplicationStep(
+      app.id,
+      "env-setup",
+      "success",
+      JSON.stringify({
+        repo: `${owner}/${repoName}`,
+        path: envPath,
+        verification: verifyOutput.trim(),
+        duration: Date.now() - startTime,
+      })
+    );
+
+    logger.info(`[EnvSetup] Env setup completed successfully`);
+    return res.json({
+      success: true,
+      message: ".env created from .env.example",
+      data: { filePath: envPath, verification: verifyOutput.trim() },
+    });
+  } catch (error: any) {
+    console.error(error);
+    const details = (() => {
+      try {
+        const base: any = { message: error?.message || String(error) };
+        if (error?.stack) base.stack = error.stack;
+        if (error?.response) {
+          base.response = {
+            status: error.response?.status,
+            headers: error.response?.headers,
+            data: error.response?.data,
+          };
+        }
+        return base;
+      } catch (_) {
+        return { message: error?.message || String(error) };
+      }
+    })();
+    logger.error(`[EnvSetup] Step failed`, details);
+    try {
+      const { host, username, applicationName } = req.body || {};
+      const app =
+        host && username && applicationName
+          ? await getApplicationByName(host, username, applicationName)
+          : null;
+      if (app?.id) {
+        await addApplicationStep(
+          app.id,
+          "env-setup",
+          "failed",
+          JSON.stringify({ error: details, duration: Date.now() - startTime })
+        );
+      }
+    } catch (_) {}
+
+    return res.status(500).json({ success: false, error: details });
+  }
+});
+
+/**
+ * POST /step/env-update
+ * Update .env file with database configuration values
+ */
+router.post("/step/env-update", async (req: Request, res: Response) => {
+  const startTime = Date.now();
+
+  try {
+    const {
+      host,
+      username,
+      applicationName,
+      pathname,
+      dbType,
+      dbPort,
+      dbName,
+      dbUsername,
+      dbPassword,
+    } = req.body;
+
+    logger.info(`[EnvUpdate] Request received`, {
+      host,
+      username,
+      applicationName,
+      pathname,
+      dbType,
+      dbPort,
+      dbName,
+      dbUsername,
+    });
+
+    if (
+      !host ||
+      !username ||
+      !applicationName ||
+      !pathname ||
+      !dbType ||
+      !dbPort ||
+      !dbName ||
+      !dbUsername
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Missing required fields: host, username, applicationName, pathname, dbType, dbPort, dbName, dbUsername",
+      });
+    }
+
+    await ensureDatabaseInitialized();
+
+    const app = await getApplicationByName(host, username, applicationName);
+    if (!app) {
+      return res.status(404).json({
+        success: false,
+        error: "Application not found. Please verify connection first.",
+      });
+    }
+
+    if (!app.sshPrivateKey) {
+      return res.status(400).json({
+        success: false,
+        error: "SSH key not found. Please verify connection first.",
+      });
+    }
+
+    // Map dbType to DB_CONNECTION value
+    const dbConnectionValue =
+      dbType.toLowerCase() === "mysql" ? "mysql" : "pgsql";
+
+    logger.info(`[EnvUpdate] Connecting to server`);
+    const ssh = new SSH2Client();
+    await new Promise<void>((resolve, reject) => {
+      ssh.on("ready", resolve);
+      ssh.on("error", reject);
+      ssh.connect({
+        host,
+        port: app.port || 22,
+        username,
+        privateKey: Buffer.from(app.sshPrivateKey),
+        readyTimeout: 30000,
+      });
+    });
+    logger.info(`[EnvUpdate] SSH connection established`);
+
+    const envPath = `${pathname}/shared/.env`;
+
+    // Helper to run remote commands with timeout
+    const execWithTimeout = (
+      cmd: string,
+      label: string,
+      timeoutMs: number = 15000,
+      allowNonZero: boolean = true
+    ): Promise<{ code: number; stdout: string; stderr: string }> => {
+      return new Promise((resolve, reject) => {
+        let stdout = "";
+        let stderr = "";
+        let finished = false;
+        const timer = setTimeout(() => {
+          if (finished) return;
+          finished = true;
+          logger.error(`[EnvUpdate] Timeout (${timeoutMs}ms) running ${label}`);
+          reject(new Error(`Timeout running ${label}`));
+        }, timeoutMs);
+
+        ssh.exec(cmd, (err: any, stream: any) => {
+          if (err) {
+            clearTimeout(timer);
+            return reject(err);
+          }
+          if (stream?.stdin) stream.stdin.end();
+          stream?.on("data", (d: Buffer) => (stdout += d.toString()));
+          stream?.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+          stream?.on("close", (code: number) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            if (stdout.trim())
+              logger.debug(`[EnvUpdate] ${label} stdout: ${stdout.trim()}`);
+            if (stderr.trim())
+              logger.debug(`[EnvUpdate] ${label} stderr: ${stderr.trim()}`);
+            if (!allowNonZero && code !== 0) {
+              const errMsg = `${label} exited with ${code}${
+                stderr ? `: ${stderr.trim()}` : ""
+              }`;
+              logger.error(`[EnvUpdate] ${errMsg}`);
+              return reject(new Error(errMsg));
+            }
+            resolve({ code, stdout, stderr });
+          });
+          stream?.on("error", (e: any) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            reject(e);
+          });
+        });
+      });
+    };
+
+    // Read existing .env file
+    logger.info(`[EnvUpdate] Reading existing .env from ${envPath}`);
+    const readResult = await execWithTimeout(
+      `cat ${envPath}`,
+      "read .env",
+      10000,
+      false
+    );
+    let envContent = readResult.stdout;
+
+    if (!envContent) {
+      logger.warn(`[EnvUpdate] .env file is empty`);
+      envContent = "";
+    }
+
+    // Parse and update .env content
+    logger.info(`[EnvUpdate] Parsing and updating .env values`);
+    const lines = envContent.split("\n");
+    const updates: Record<string, string> = {
+      DB_CONNECTION: dbConnectionValue,
+      DB_HOST: "localhost",
+      DB_PORT: String(dbPort),
+      DB_DATABASE: dbName,
+      DB_USERNAME: dbUsername,
+      DB_PASSWORD: dbPassword || "",
+    };
+
+    const updatedLines = lines.map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        return line; // Keep empty lines and comments
+      }
+
+      const [key] = trimmed.split("=");
+      if (key && updates.hasOwnProperty(key.trim())) {
+        logger.debug(
+          `[EnvUpdate] Updating ${key.trim()} = ${updates[key.trim()]}`
+        );
+        return `${key.trim()}=${updates[key.trim()]}`;
+      }
+
+      return line;
+    });
+
+    // Add any missing keys
+    const existingKeys = new Set(
+      lines
+        .map((line) => line.split("=")[0].trim())
+        .filter((key) => key && !key.startsWith("#"))
+    );
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (!existingKeys.has(key)) {
+        logger.debug(`[EnvUpdate] Adding missing key ${key} = ${value}`);
+        updatedLines.push(`${key}=${value}`);
+      }
+    }
+
+    const newEnvContent = updatedLines.join("\n");
+
+    // Write updated .env file
+    logger.info(`[EnvUpdate] Writing updated .env to ${envPath}`);
+    const heredoc = "EOF_ENV_UPDATE";
+    await execWithTimeout(
+      `cat <<'${heredoc}' > ${envPath}\n${newEnvContent}\n${heredoc}`,
+      "write .env",
+      15000,
+      false
+    );
+    logger.info(`[EnvUpdate] .env update completed`);
+
+    // Verify update
+    logger.info(`[EnvUpdate] Verifying .env update`);
+    const verifyResult = await execWithTimeout(
+      `grep -E "^DB_" ${envPath}`,
+      "verify .env",
+      10000,
+      true
+    );
+    const dbLines = verifyResult.stdout;
+
+    ssh.end();
+    logger.info(`[EnvUpdate] SSH session closed`);
+
+    await addApplicationStep(
+      app.id,
+      "env-update",
+      "success",
+      JSON.stringify({
+        path: envPath,
+        dbType: dbConnectionValue,
+        dbPort,
+        dbName,
+        dbUsername,
+        verification: dbLines.trim(),
+        duration: Date.now() - startTime,
+      })
+    );
+
+    logger.info(`[EnvUpdate] Env update completed successfully`);
+    return res.json({
+      success: true,
+      message: ".env updated with database configuration",
+      data: {
+        filePath: envPath,
+        updates: {
+          DB_CONNECTION: dbConnectionValue,
+          DB_HOST: "localhost",
+          DB_PORT: dbPort,
+          DB_DATABASE: dbName,
+          DB_USERNAME: dbUsername,
+        },
+        verification: dbLines.trim(),
+      },
+    });
+  } catch (error: any) {
+    logger.error(`[EnvUpdate] Step failed: ${error.message}`);
+
+    try {
+      const app = await getApplicationByName(
+        req.body.host,
+        req.body.username,
+        req.body.applicationName
+      );
+      if (app) {
+        await addApplicationStep(
+          app.id,
+          "env-update",
+          "failed",
+          JSON.stringify({
+            error: error.message,
+            duration: Date.now() - startTime,
+          })
+        );
+      }
+    } catch (e) {}
+
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
