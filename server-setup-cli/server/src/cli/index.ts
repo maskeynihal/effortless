@@ -348,6 +348,7 @@ class EffortlessCLI {
             { name: "Setup application folder", value: "folder" },
             { name: "Setup environment (.env)", value: "env" },
             { name: "Update .env with database config", value: "env-update" },
+            { name: "Setup SSH key for GitHub Actions", value: "ssh-key" },
             { name: "View step logs", value: "logs" },
             { name: "Exit", value: "exit" },
           ],
@@ -369,6 +370,9 @@ class EffortlessCLI {
           break;
         case "env-update":
           await this.runEnvUpdate();
+          break;
+        case "ssh-key":
+          await this.runSSHKeySetup();
           break;
         case "logs":
           await this.showLogs();
@@ -690,6 +694,84 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(`❌ Env update failed: ${this.describeAxiosError(error)}`);
+    }
+    console.log("");
+  }
+
+  private async runSSHKeySetup(): Promise<void> {
+    if (!this.config) return;
+
+    // Get the selected repo or prompt for it
+    let repo: string | null = null;
+
+    if (this.config.selectedRepo) {
+      repo = this.config.selectedRepo;
+    } else if (this.config.githubToken) {
+      const repos = await this.fetchGitHubRepos();
+      if (repos.length > 0) {
+        const { repoChoice } = await inquirer.prompt([
+          {
+            type: "list",
+            name: "repoChoice",
+            message: "Choose a repository:",
+            choices: [
+              ...repos.map((name) => ({ name, value: name })),
+              { name: "Enter owner/repo manually", value: "__manual__" },
+            ],
+            pageSize: 15,
+          },
+        ]);
+
+        if (repoChoice !== "__manual__") {
+          repo = repoChoice as string;
+        }
+      }
+    }
+
+    if (!repo) {
+      const manual = await inquirer.prompt([
+        {
+          type: "input",
+          name: "repo",
+          message: "Repository (owner/repo or https URL):",
+          validate: (v) =>
+            v && v.includes("/") ? true : "Please provide owner/repo",
+        },
+      ]);
+      repo = manual.repo;
+    }
+
+    if (!repo) {
+      console.error("No repository provided; skipping SSH key setup.");
+      return;
+    }
+
+    console.log("\n⏳ Setting up SSH key for GitHub Actions...\n");
+    try {
+      const response = await axios.post(`${API_URL}/step/ssh-key-setup`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        selectedRepo: repo.trim(),
+      });
+
+      if (response.data.success) {
+        console.log("✅ SSH key setup completed");
+        console.log(`\nSecret Name: ${response.data.data?.secretName}`);
+        console.log(`\nAdd this to your GitHub Actions workflow:`);
+        console.log(
+          `  ssh-key: \${{ secrets.${response.data.data?.secretName} }}`
+        );
+        console.log(
+          `\nPublic key has been added to authorized_keys on the server.`
+        );
+      } else {
+        console.error(`❌ SSH key setup failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(
+        `❌ SSH key setup failed: ${this.describeAxiosError(error)}`
+      );
     }
     console.log("");
   }

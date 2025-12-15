@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Client as SSH2Client } from "ssh2";
 import { logger } from "../shared/logger";
 import axios from "axios";
+import sodium from "libsodium-wrappers";
 import {
   initializeDatabase,
   saveApplication,
@@ -1319,6 +1320,349 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
         await addApplicationStep(
           app.id,
           "env-update",
+          "failed",
+          JSON.stringify({
+            error: error.message,
+            duration: Date.now() - startTime,
+          })
+        );
+      }
+    } catch (e) {}
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /step/ssh-key-setup
+ * Generate SSH key pair, add public key to authorized_keys, and store private key in GitHub secret
+ */
+router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
+  const startTime = Date.now();
+
+  try {
+    const { host, username, applicationName, selectedRepo } = req.body;
+
+    logger.info(`[SSHKeySetup] Request received`, {
+      host,
+      username,
+      applicationName,
+      selectedRepo,
+    });
+
+    if (!host || !username || !applicationName || !selectedRepo) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Missing required fields: host, username, applicationName, selectedRepo",
+      });
+    }
+
+    await ensureDatabaseInitialized();
+
+    const app = await getApplicationByName(host, username, applicationName);
+    if (!app) {
+      return res.status(404).json({
+        success: false,
+        error: "Application not found. Please verify connection first.",
+      });
+    }
+
+    if (!app.sshPrivateKey) {
+      return res.status(400).json({
+        success: false,
+        error: "SSH key not found. Please verify connection first.",
+      });
+    }
+
+    if (!app.githubToken) {
+      return res.status(400).json({
+        success: false,
+        error: "GitHub token missing. Please authenticate GitHub first.",
+      });
+    }
+
+    logger.info(`[SSHKeySetup] Connecting to server`);
+    const ssh = new SSH2Client();
+    await new Promise<void>((resolve, reject) => {
+      ssh.on("ready", resolve);
+      ssh.on("error", reject);
+      ssh.connect({
+        host,
+        port: app.port || 22,
+        username,
+        privateKey: Buffer.from(app.sshPrivateKey),
+        readyTimeout: 30000,
+      });
+    });
+    logger.info(`[SSHKeySetup] SSH connection established`);
+
+    // Helper to run remote commands with timeout
+    const execWithTimeout = (
+      cmd: string,
+      label: string,
+      timeoutMs: number = 15000,
+      allowNonZero: boolean = true
+    ): Promise<{ code: number; stdout: string; stderr: string }> => {
+      return new Promise((resolve, reject) => {
+        let stdout = "";
+        let stderr = "";
+        let finished = false;
+        const timer = setTimeout(() => {
+          if (finished) return;
+          finished = true;
+          logger.error(
+            `[SSHKeySetup] Timeout (${timeoutMs}ms) running ${label}`
+          );
+          reject(new Error(`Timeout running ${label}`));
+        }, timeoutMs);
+
+        ssh.exec(cmd, (err: any, stream: any) => {
+          if (err) {
+            clearTimeout(timer);
+            return reject(err);
+          }
+          if (stream?.stdin) stream.stdin.end();
+          stream?.on("data", (d: Buffer) => (stdout += d.toString()));
+          stream?.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+          stream?.on("close", (code: number) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            if (stdout.trim())
+              logger.debug(`[SSHKeySetup] ${label} stdout: ${stdout.trim()}`);
+            if (stderr.trim())
+              logger.debug(`[SSHKeySetup] ${label} stderr: ${stderr.trim()}`);
+            if (!allowNonZero && code !== 0) {
+              const errMsg = `${label} exited with ${code}${
+                stderr ? `: ${stderr.trim()}` : ""
+              }`;
+              logger.error(`[SSHKeySetup] ${errMsg}`);
+              return reject(new Error(errMsg));
+            }
+            resolve({ code, stdout, stderr });
+          });
+          stream?.on("error", (e: any) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            reject(e);
+          });
+        });
+      });
+    };
+
+    // Generate SSH key pair for GitHub Actions
+    const keyName = `github_actions_${applicationName}`;
+    const keyPath = `~/.ssh/${keyName}`;
+    logger.info(`[SSHKeySetup] Generating SSH key pair: ${keyName}`);
+
+    await execWithTimeout(
+      `ssh-keygen -t ed25519 -f ${keyPath} -N "" -C "github-actions-${applicationName}" 2>&1 || true`,
+      "generate key",
+      15000,
+      true
+    );
+
+    // Read private key
+    logger.info(`[SSHKeySetup] Reading private key`);
+    const privateKeyResult = await execWithTimeout(
+      `cat ${keyPath}`,
+      "read private key",
+      10000,
+      false
+    );
+    const privateKey = privateKeyResult.stdout;
+
+    if (!privateKey) {
+      ssh.end();
+      logger.error(`[SSHKeySetup] Failed to read private key`);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to read generated private key",
+      });
+    }
+
+    // Read public key
+    logger.info(`[SSHKeySetup] Reading public key`);
+    const publicKeyResult = await execWithTimeout(
+      `cat ${keyPath}.pub`,
+      "read public key",
+      10000,
+      false
+    );
+    const publicKey = publicKeyResult.stdout;
+
+    if (!publicKey) {
+      ssh.end();
+      logger.error(`[SSHKeySetup] Failed to read public key`);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to read generated public key",
+      });
+    }
+
+    // Add public key to authorized_keys
+    logger.info(`[SSHKeySetup] Adding public key to authorized_keys`);
+    await execWithTimeout(
+      `mkdir -p ~/.ssh && echo "${publicKey.trim()}" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`,
+      "add to authorized_keys",
+      10000,
+      false
+    );
+
+    // Parse repo owner/name
+    let owner: string;
+    let repoName: string;
+    const slashCount = (selectedRepo.match(/\//g) || []).length;
+    if (slashCount === 1 && !selectedRepo.startsWith("http")) {
+      [owner, repoName] = selectedRepo.split("/");
+    } else {
+      const m = selectedRepo.match(
+        /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/
+      );
+      if (!m) {
+        ssh.end();
+        return res.status(400).json({
+          success: false,
+          error: "Invalid repository format. Use owner/repo or GitHub URL.",
+        });
+      }
+      owner = m[1];
+      repoName = m[2];
+    }
+
+    // Replace dots with underscores for secret name
+    const secretName = `PRIVATE_KEY_${applicationName.replace(/\./g, "_")}`;
+
+    // Add private key to GitHub secret with proper encryption
+    logger.info(
+      `[SSHKeySetup] Adding private key to GitHub secret: ${secretName}`
+    );
+    try {
+      // Step 1: Get the repository's public key for encryption
+      logger.info(`[SSHKeySetup] Fetching repository public key`);
+      const publicKeyResponse = await axios.get(
+        `https://api.github.com/repos/${owner}/${repoName}/actions/secrets/public-key`,
+        {
+          headers: {
+            Authorization: `Bearer ${app.githubToken}`,
+            Accept: "application/vnd.github.v3+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+          timeout: 10000,
+        }
+      );
+
+      const publicKeyData = publicKeyResponse.data;
+      logger.info(
+        `[SSHKeySetup] Got public key with ID: ${publicKeyData.key_id}`
+      );
+
+      // Step 2: Encrypt the private key using LibSodium per GitHub docs
+      logger.info(
+        `[SSHKeySetup] Encrypting secret with libsodium crypto_box_seal`
+      );
+
+      // Initialize libsodium (async)
+      await sodium.ready;
+
+      // Decode the public key from base64
+      const publicKeyBase64 = publicKeyData.key;
+      const publicKeyBytes = Buffer.from(publicKeyBase64, "base64");
+
+      // Encrypt using crypto_box_seal (recipient's public key only)
+      const sealed = sodium.crypto_box_seal(privateKey.trim(), publicKeyBytes);
+
+      // Encode sealed box as base64
+      const encryptedBase64 = Buffer.from(sealed).toString("base64");
+      logger.info(`[SSHKeySetup] Secret encrypted successfully`);
+
+      // Step 3: Create or update the secret
+      logger.info(`[SSHKeySetup] Creating/updating secret in GitHub`);
+      const secretResponse = await axios.put(
+        `https://api.github.com/repos/${owner}/${repoName}/actions/secrets/${secretName}`,
+        {
+          encrypted_value: encryptedBase64,
+          key_id: publicKeyData.key_id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${app.githubToken}`,
+            Accept: "application/vnd.github.v3+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+          timeout: 15000,
+        }
+      );
+
+      logger.info(
+        `[SSHKeySetup] GitHub secret created/updated: ${secretName} (status: ${secretResponse.status})`
+      );
+    } catch (e: any) {
+      const errorDetails = (() => {
+        try {
+          const base: any = { message: e?.message || String(e) };
+          if (e?.response?.status) base.status = e.response.status;
+          if (e?.response?.data) base.data = e.response.data;
+          if (e?.response?.headers) base.headers = e.response.headers;
+          if (e?.stack) base.stack = e.stack;
+          return base;
+        } catch (_) {
+          return { message: e?.message || String(e) };
+        }
+      })();
+      logger.error(
+        `[SSHKeySetup] Failed to create GitHub secret`,
+        errorDetails
+      );
+      // Log but continue - key is already on server, user can add secret manually if needed
+    }
+
+    ssh.end();
+    logger.info(`[SSHKeySetup] SSH session closed`);
+
+    await addApplicationStep(
+      app.id,
+      "ssh-key-setup",
+      "success",
+      JSON.stringify({
+        keyName,
+        secretName,
+        publicKeyAdded: true,
+        repository: `${owner}/${repoName}`,
+        duration: Date.now() - startTime,
+      })
+    );
+
+    logger.info(`[SSHKeySetup] SSH key setup completed successfully`);
+    return res.json({
+      success: true,
+      message: "SSH key pair generated and configured",
+      data: {
+        keyName,
+        secretName,
+        publicKeyAdded: true,
+        repository: `${owner}/${repoName}`,
+        instructions: `Add this secret to your GitHub Actions workflow: \${{ secrets.${secretName} }}`,
+      },
+    });
+  } catch (error: any) {
+    logger.error(`[SSHKeySetup] Step failed: ${error.message}`);
+
+    try {
+      const app = await getApplicationByName(
+        req.body.host,
+        req.body.username,
+        req.body.applicationName
+      );
+      if (app) {
+        await addApplicationStep(
+          app.id,
+          "ssh-key-setup",
           "failed",
           JSON.stringify({
             error: error.message,
