@@ -341,12 +341,18 @@ class EffortlessCLI {
           name: "action",
           message: "Select a step to run (all steps are repeatable):",
           choices: [
+            {
+              name: "Setup server stack (PHP/Nginx/Database)",
+              value: "server-stack",
+            },
             { name: "Generate & register deploy key", value: "deploy" },
             { name: "Create database", value: "db" },
             { name: "Setup application folder", value: "folder" },
             { name: "Setup environment (.env)", value: "env" },
             { name: "Update .env with database config", value: "env-update" },
             { name: "Setup SSH key for GitHub Actions", value: "ssh-key" },
+            { name: "Install Node.js using NVM", value: "node-nvm" },
+            { name: "Setup HTTPS + Nginx", value: "https-nginx" },
             {
               name: "Create GitHub Actions workflow and open PR",
               value: "deploy-workflow-update",
@@ -358,6 +364,9 @@ class EffortlessCLI {
       ]);
 
       switch (action) {
+        case "server-stack":
+          await this.runServerStackSetup();
+          break;
         case "deploy":
           await this.runDeployKey();
           break;
@@ -375,6 +384,12 @@ class EffortlessCLI {
           break;
         case "ssh-key":
           await this.runSSHKeySetup();
+          break;
+        case "node-nvm":
+          await this.runNodeNVMSetup();
+          break;
+        case "https-nginx":
+          await this.runHttpsNginxSetup();
           break;
         case "deploy-workflow-update":
           await this.runDeployWorkflowUpdate();
@@ -776,6 +791,273 @@ class EffortlessCLI {
     } catch (error: any) {
       console.error(
         `❌ SSH key setup failed: ${this.describeAxiosError(error)}`
+      );
+    }
+    console.log("");
+  }
+
+  private async runServerStackSetup(): Promise<void> {
+    if (!this.config) return;
+
+    // Prompt for PHP version and database type
+    const answers = await inquirer.prompt([
+      {
+        type: "list",
+        name: "phpVersion",
+        message: "Select PHP version:",
+        choices: [
+          { name: "PHP 8.3 (Latest)", value: "8.3" },
+          { name: "PHP 8.2", value: "8.2" },
+          { name: "PHP 8.1", value: "8.1" },
+          { name: "PHP 8.0", value: "8.0" },
+          { name: "PHP 7.4", value: "7.4" },
+        ],
+        default: "8.3",
+      },
+      {
+        type: "list",
+        name: "database",
+        message: "Select database server:",
+        choices: [
+          { name: "MySQL", value: "mysql" },
+          { name: "PostgreSQL", value: "pgsql" },
+        ],
+        default: "mysql",
+      },
+    ]);
+
+    console.log(
+      "\n⏳ Installing server stack (this may take 5-10 minutes)...\n"
+    );
+    console.log(`📦 PHP ${answers.phpVersion}`);
+    console.log(`📦 ${answers.database === "mysql" ? "MySQL" : "PostgreSQL"}`);
+    console.log("📦 Nginx");
+    console.log("📦 Composer");
+    console.log("📦 All Laravel extensions\n");
+
+    try {
+      const response = await axios.post(`${API_URL}/step/server-stack-setup`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        phpVersion: answers.phpVersion,
+        database: answers.database,
+      });
+
+      if (response.data.success) {
+        console.log("✅ Server stack installed successfully\n");
+        console.log("📋 Installed versions:");
+        if (response.data.data?.versions) {
+          const v = response.data.data.versions;
+          if (v.php) console.log(`  PHP: ${v.php}`);
+          if (v.composer) console.log(`  Composer: ${v.composer}`);
+          if (v.nginx) console.log(`  Nginx: ${v.nginx}`);
+          if (v.database) console.log(`  Database: ${v.database}`);
+        }
+        console.log(
+          `\n📦 Extensions installed: ${
+            response.data.data?.extensionsInstalled || 0
+          }`
+        );
+        if (response.data.data?.installLog) {
+          console.log("\n📝 Installation log:");
+          response.data.data.installLog.forEach((log: string) => {
+            console.log(`  ✓ ${log}`);
+          });
+        }
+      } else {
+        console.error(`❌ Server stack setup failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(
+        `❌ Server stack setup failed: ${this.describeAxiosError(error)}`
+      );
+    }
+    console.log("");
+  }
+
+  private async runHttpsNginxSetup(): Promise<void> {
+    if (!this.config) return;
+
+    // Prompt for domain and email
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "domain",
+        message: "Domain for HTTPS (e.g. example.com):",
+        default: this.config.domain || `${this.config.applicationName}.local`,
+      },
+      {
+        type: "input",
+        name: "email",
+        message: "Admin email for Let's Encrypt notifications:",
+        validate: (v: string) =>
+          !!v && v.includes("@") ? true : "Valid email required",
+      },
+    ]);
+
+    const domain = (answers.domain as string).trim();
+    const email = (answers.email as string).trim();
+
+    // Keep config in sync
+    this.config.domain = domain;
+
+    console.log("\n⏳ Setting up HTTPS + Nginx...\n");
+    try {
+      const response = await axios.post(`${API_URL}/step/https-nginx-setup`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        domain,
+        email,
+      });
+
+      if (response.data.success) {
+        console.log("✅ Nginx configured and HTTPS certificates provisioned");
+        console.table(response.data.data || {});
+      } else {
+        console.error(`❌ HTTPS + Nginx setup failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(
+        `❌ HTTPS + Nginx setup failed: ${this.describeAxiosError(error)}`
+      );
+    }
+    console.log("");
+  }
+
+  private async runNodeNVMSetup(): Promise<void> {
+    if (!this.config) return;
+
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "nodeVersion",
+        message: "Node.js version to install (e.g., 20, 18, 22):",
+        default: "20",
+        validate: (v: string) => (!!v.trim() ? true : "Version required"),
+      },
+    ]);
+
+    const nodeVersion = (answers.nodeVersion as string).trim();
+
+    console.log(`\n⏳ Installing Node.js ${nodeVersion} using NVM...\n`);
+    try {
+      const response = await axios.post(`${API_URL}/step/node-nvm-setup`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        nodeVersion,
+      });
+
+      if (response.data.success) {
+        console.log("✅ Node.js and NVM installed successfully");
+        console.table(response.data.data?.versions || {});
+        if (response.data.data?.instructions) {
+          console.log(`\nℹ️  ${response.data.data.instructions}`);
+        }
+      } else {
+        console.error(`❌ Node.js/NVM setup failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(
+        `❌ Node.js/NVM setup failed: ${this.describeAxiosError(error)}`
+      );
+    }
+    console.log("");
+  }
+
+  private async runCertbotNginxSetup(): Promise<void> {
+    if (!this.config) return;
+
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "domain",
+        message: "Domain for HTTPS certificate (e.g. example.com):",
+        default: this.config.domain || `${this.config.applicationName}.local`,
+      },
+      {
+        type: "input",
+        name: "email",
+        message: "Admin email for Let's Encrypt notifications:",
+        validate: (v: string) =>
+          !!v && v.includes("@") ? true : "Valid email required",
+      },
+    ]);
+
+    const domain = (answers.domain as string).trim();
+    const email = (answers.email as string).trim();
+    this.config.domain = domain;
+
+    console.log(
+      "\n⏳ Installing Nginx with minimal config and issuing HTTPS certificate...\n"
+    );
+    try {
+      const response = await axios.post(`${API_URL}/step/certbot-nginx-setup`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        domain,
+        email,
+      });
+
+      if (response.data.success) {
+        console.log("✅ Nginx installed with HTTPS certificate provisioned");
+        console.table(response.data.data || {});
+      } else {
+        console.error(`❌ Certbot Nginx setup failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(
+        `❌ Certbot Nginx setup failed: ${this.describeAxiosError(error)}`
+      );
+    }
+    console.log("");
+  }
+
+  private async runCertbotIssue(): Promise<void> {
+    if (!this.config) return;
+
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "domain",
+        message: "Domain to issue HTTPS certificate (e.g. example.com):",
+        default: this.config.domain || `${this.config.applicationName}.local`,
+      },
+      {
+        type: "input",
+        name: "email",
+        message: "Admin email for Let's Encrypt notifications:",
+        validate: (v: string) =>
+          !!v && v.includes("@") ? true : "Valid email required",
+      },
+    ]);
+
+    const domain = (answers.domain as string).trim();
+    const email = (answers.email as string).trim();
+    this.config.domain = domain;
+
+    console.log("\n⏳ Issuing HTTPS certificate via Certbot...\n");
+    try {
+      const response = await axios.post(`${API_URL}/step/certbot-issue`, {
+        host: this.config.host,
+        username: this.config.username,
+        applicationName: this.config.applicationName,
+        domain,
+        email,
+      });
+
+      if (response.data.success) {
+        console.log("✅ Certificate issued");
+        console.table(response.data.data || {});
+      } else {
+        console.error(`❌ Certbot issuance failed: ${response.data.error}`);
+      }
+    } catch (error: any) {
+      console.error(
+        `❌ Certbot issuance failed: ${this.describeAxiosError(error)}`
       );
     }
     console.log("");

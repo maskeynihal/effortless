@@ -16,6 +16,7 @@ services:
       - ./src:/app/src
       - ./dist:/app/dist
       - ./data:/app/data
+      - ./templates:/app/templates
       - ./migrations:/app/migrations
       - ./knexfile.cjs:/app/knexfile.cjs
     command: sh /app/scripts/start-server.sh

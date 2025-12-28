@@ -106,6 +106,64 @@ The CLI will guide you through:
 
 ## API Endpoints
 
+### Server Stack Setup
+
+Install complete server stack with PHP, Nginx, database, and all Laravel-required extensions.
+
+```bash
+POST /api/step/server-stack-setup
+Content-Type: application/json
+
+{
+  "host": "example.com",
+  "username": "deploy",
+  "applicationName": "my-app",
+  "phpVersion": "8.3",      # Options: "8.3", "8.2", "8.1", "8.0", "7.4"
+  "database": "mysql"       # Options: "mysql", "pgsql"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Server stack installed successfully",
+  "data": {
+    "phpVersion": "8.3",
+    "database": "mysql",
+    "extensionsInstalled": 18,
+    "installLog": [
+      "Added ondrej/php PPA",
+      "Installed Nginx",
+      "Installed MySQL server",
+      "Installed PHP 8.3 with 18 extensions",
+      "Installed Composer",
+      "Configured and started PHP-FPM",
+      "Started Nginx"
+    ],
+    "versions": {
+      "php": "PHP 8.3.0 (cli)",
+      "composer": "Composer version 2.6.5",
+      "nginx": "nginx/1.24.0",
+      "database": "mysql  Ver 8.0.35"
+    }
+  }
+}
+```
+
+**Installed PHP Extensions:**
+
+- Core: cli, fpm, mbstring, xml, bcmath, curl, zip, gd, intl, soap, opcache, readline, common
+- Database: mysql, mysqli (for MySQL) OR pgsql (for PostgreSQL)
+- Additional: redis, imagick
+
+**What gets installed:**
+
+- PHP with specified version via ondrej/php (Ubuntu/Debian) or Remi (RHEL/CentOS)
+- Nginx web server
+- MySQL or PostgreSQL database server
+- Composer (latest version)
+- PHP-FPM configured and running
+- All necessary PHP extensions for Laravel
+
 ### Initialize Workflow
 
 ```bash
