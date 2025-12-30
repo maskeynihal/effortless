@@ -15,6 +15,7 @@ import {
   getApplicationSteps,
   updateApplicationStatus,
   updatePrivateKeySecretName,
+  updateApplicationSetupPathname,
 } from "../shared/database";
 import { SSHConnectionStep } from "../steps/sshConnectionStep";
 import { GitHubAuthStep } from "../steps/githubAuthStep";
@@ -247,6 +248,198 @@ router.post("/connection/verify", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error(`[Connection] Verification failed: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /applications
+ * Create a new application record
+ */
+router.post("/applications", async (req: Request, res: Response) => {
+  try {
+    const { host, username, port = 22, applicationName } = req.body || {};
+
+    if (!host || !username || !applicationName) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: host, username, applicationName",
+      });
+    }
+
+    await ensureDatabaseInitialized();
+
+    const sessionId = uuidv4();
+
+    const result = await saveApplication({
+      sessionId,
+      host,
+      username,
+      port: Number(port) || 22,
+      applicationName,
+    });
+
+    logger.info(
+      `[Applications] Created application ${applicationName} for ${username}@${host}`
+    );
+
+    res.json({
+      success: true,
+      message: "Application created",
+      data: {
+        id: result.id,
+        sessionId,
+        host,
+        username,
+        port: Number(port) || 22,
+        applicationName,
+      },
+    });
+  } catch (error: any) {
+    logger.error(
+      `[Applications] Failed to create application: ${error.message}`
+    );
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /step/check-github-token
+ * Check GitHub token validity and save to database if valid
+ */
+router.post("/step/check-github-token", async (req: Request, res: Response) => {
+  try {
+    const { githubToken, host, username, applicationName } = req.body;
+
+    if (!githubToken) {
+      return res.status(400).json({
+        success: false,
+        error: "GitHub token is required",
+      });
+    }
+
+    if (!host || !username || !applicationName) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: host, username, applicationName",
+      });
+    }
+
+    logger.info(`[GitHub] Checking token validity for ${applicationName}`);
+
+    try {
+      // Call GitHub API to verify token
+      const response = await axios.get("https://api.github.com/user", {
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+        timeout: 10000,
+      });
+
+      const githubUsername = response.data.login;
+      const githubName = response.data.name || githubUsername;
+
+      logger.info(`[GitHub] Token valid for user: ${githubUsername}`);
+
+      // Initialize database and save token to application
+      await ensureDatabaseInitialized();
+
+      // Get or create application
+      let app = await getApplicationByName(host, username, applicationName);
+      if (!app) {
+        logger.info(
+          `[GitHub] Application not found, creating new one for ${applicationName}`
+        );
+        // Create a minimal application entry if it doesn't exist
+        const sessionId = uuidv4();
+        const result = await saveApplication({
+          sessionId,
+          host,
+          username,
+          port: 22,
+          applicationName,
+          githubToken,
+          githubUsername,
+        });
+        app = { ...app, id: result.id };
+      } else {
+        // Update existing application with GitHub token
+        logger.info(`[GitHub] Updating application with GitHub token`);
+        await saveApplication({
+          sessionId: app.sessionId,
+          host,
+          username,
+          port: app.port || 22,
+          applicationName,
+          sshPrivateKey: app.sshPrivateKey,
+          githubToken,
+          githubUsername,
+        });
+      }
+
+      logger.info(`[GitHub] Token saved to database for ${applicationName}`);
+
+      // Log the step
+      if (app?.id) {
+        await addApplicationStep(
+          app.id,
+          "github-token-check",
+          "success",
+          JSON.stringify({
+            username: githubUsername,
+            name: githubName,
+            message: `GitHub token verified for ${githubUsername}`,
+          })
+        );
+      }
+
+      res.json({
+        success: true,
+        message: `GitHub token verified for ${githubUsername}`,
+        data: {
+          login: githubUsername,
+          name: githubName,
+        },
+      });
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message || error.message || "Token is invalid";
+      logger.error(`[GitHub] Token validation failed: ${errorMessage}`);
+
+      // Log the failure
+      if (host && username && applicationName) {
+        try {
+          const app = await getApplicationByName(
+            host,
+            username,
+            applicationName
+          );
+          if (app?.id) {
+            await addApplicationStep(
+              app.id,
+              "github-token-check",
+              "failed",
+              JSON.stringify({
+                error: errorMessage,
+              })
+            );
+          }
+        } catch (e) {
+          logger.debug(`[GitHub] Could not log failure step: ${e}`);
+        }
+      }
+
+      res.status(401).json({
+        success: false,
+        error: errorMessage,
+      });
+    }
+  } catch (error: any) {
+    logger.error(`[GitHub] Token check failed: ${error.message}`);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -690,6 +883,14 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
     ssh.end();
 
     logger.info(`[Folder] Setup completed`);
+
+    // Save pathname to application record
+    const db =
+      require("../shared/database").getDb?.() ||
+      require("knex")(
+        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+      );
+    await db("applications").where({ id: app.id }).update({ pathname });
 
     // Log success
     await addApplicationStep(
@@ -3923,8 +4124,6 @@ router.get("/health", (req: Request, res: Response) => {
   });
 });
 
-export default router;
-
 /**
  * POST /step/deploy-workflow-update
  * Prompt for a base branch name, update deploy.yml on a new feature branch, and open a PR.
@@ -3934,6 +4133,7 @@ router.post(
   "/step/deploy-workflow-update",
   async (req: Request, res: Response) => {
     const startTime = Date.now();
+    logger.info("[DeployWorkflow] Request received", req.body);
 
     try {
       const {
@@ -3965,6 +4165,7 @@ router.post(
 
       await ensureDatabaseInitialized();
       const app = await getApplicationByName(host, username, applicationName);
+      logger.info("[DeployWorkflow] Fetched application data");
       if (!app) {
         return res.status(404).json({
           success: false,
@@ -4008,17 +4209,67 @@ router.post(
         timeout: 15000,
       });
 
-      // 1) Resolve base branch ref/commit
-      const refResp = await gh.get(
-        `/repos/${owner}/${repoName}/git/refs/heads/${encodeURIComponent(
-          baseBranch
-        )}`
-      );
-      const baseSha = refResp.data?.object?.sha || refResp.data?.sha;
+      // 1) Resolve base branch ref/commit - try requested branch first, create from 'dev' if not found
+      let baseSha: string | null = null;
+      let actualBaseBranch = baseBranch;
+      let branchCreated = false;
+
+      try {
+        const refResp = await gh.get(
+          `/repos/${owner}/${repoName}/git/refs/heads/${encodeURIComponent(
+            baseBranch
+          )}`
+        );
+        baseSha = refResp.data?.object?.sha || refResp.data?.sha;
+        logger.info(
+          `[DeployWorkflow] Found base branch '${baseBranch}' and SHA ${baseSha}`
+        );
+      } catch (e: any) {
+        // If the specified branch doesn't exist, create it from 'dev'
+        if (e?.response?.status === 404) {
+          logger.info(
+            `[DeployWorkflow] Branch '${baseBranch}' not found, attempting to create from 'dev'`
+          );
+          try {
+            // Get 'dev' branch ref
+            const devRefResp = await gh.get(
+              `/repos/${owner}/${repoName}/git/refs/heads/dev`
+            );
+            const devSha = devRefResp.data?.object?.sha || devRefResp.data?.sha;
+
+            if (devSha) {
+              // Create the requested branch from 'dev'
+              logger.info(
+                `[DeployWorkflow] Creating branch '${baseBranch}' from 'dev'`
+              );
+              await gh.post(`/repos/${owner}/${repoName}/git/refs`, {
+                ref: `refs/heads/${baseBranch}`,
+                sha: devSha,
+              });
+              baseSha = devSha;
+              actualBaseBranch = baseBranch;
+              branchCreated = true;
+              logger.info(
+                `[DeployWorkflow] Successfully created branch '${baseBranch}' from 'dev'`
+              );
+            }
+          } catch (devBranchError: any) {
+            logger.error(
+              `[DeployWorkflow] Failed to create branch from 'dev': ${devBranchError.message}`
+            );
+            // If 'dev' doesn't exist either, return error
+            return res.status(404).json({
+              success: false,
+              error: `Base branch '${baseBranch}' not found and 'dev' branch is not available to create it from`,
+            });
+          }
+        }
+      }
+
       if (!baseSha) {
         return res.status(404).json({
           success: false,
-          error: `Base branch not found: ${baseBranch}`,
+          error: `Base branch '${baseBranch}' not found and could not be created`,
         });
       }
 
@@ -4031,6 +4282,9 @@ router.post(
         ref: `refs/heads/${featureBranch}`,
         sha: baseSha,
       });
+      logger.info(
+        `[DeployWorkflow] Created feature branch '${featureBranch}' from '${actualBaseBranch}'`
+      );
 
       // 3) Find deploy.yml (common locations)
       const candidatePaths = [
@@ -4123,41 +4377,140 @@ router.post(
           branch: featureBranch,
         }
       );
+      logger.info(`[DeployWorkflow] Updated ${deployPath} on feature branch`);
 
-      // 6) Create a PR to the base branch
-      const prTitle = `Update deploy.yml for ${applicationName}`;
+      // 6) Create GitHub Actions workflow file
+      const secretName: string =
+        app.privateKeySecretName ||
+        `PRIVATE_KEY_${applicationName
+          .replace(/[^A-Za-z0-9]/g, "_")
+          .toUpperCase()}`;
+
+      const workflowPath = `.github/workflows/laravel-project-deployment.yml`;
+      const workflowContent = `name: Deploy ${applicationName}
+run-name: Deploy to production for \${{ github.ref }} by @\${{ github.actor }} (\${{ github.sha }})
+
+on:
+  push:
+    branches:
+      - ${actualBaseBranch}
+
+jobs:
+  deploy:
+    uses: maskeynihal/gh-actions/.github/workflows/reusable_deploy_laravel.yml@main
+    with:
+      php-version: "8.3"
+    secrets:
+      PRIVATE_KEY: \${{ secrets.${secretName} }}
+      VAULT_ADDR: \${{ secrets.VAULT_ADDR }}
+      VAULT_TOKEN: \${{ secrets.VAULT_TOKEN }}
+      VAULT_PATH: \${{ vars.VAULT_PATH }}
+`;
+
+      // Check if workflow file exists
+      let workflowFileSha: string | undefined;
+      try {
+        const existingFile = await gh.get(
+          `/repos/${owner}/${repoName}/contents/${workflowPath}?ref=${featureBranch}`
+        );
+        workflowFileSha = existingFile.data.sha;
+        logger.info(
+          `[DeployWorkflow] Found existing workflow file, will update`
+        );
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          logger.info(`[DeployWorkflow] Will create new workflow file`);
+        } else {
+          throw err;
+        }
+      }
+
+      // Commit workflow file to feature branch
+      logger.info(`[DeployWorkflow] Committing workflow file...`);
+      const workflowPayload: any = {
+        message: `feat: add deployment workflow for ${applicationName}`,
+        content: Buffer.from(workflowContent, "utf-8").toString("base64"),
+        branch: featureBranch,
+      };
+      if (workflowFileSha) {
+        workflowPayload.sha = workflowFileSha;
+      }
+
+      const workflowResp = await gh.put(
+        `/repos/${owner}/${repoName}/contents/${workflowPath}`,
+        workflowPayload
+      );
+      logger.info(`[DeployWorkflow] Workflow file committed`);
+
+      // 7) Create a PR to the base branch
+      const prTitle = `Deploy: Add deployment configuration for ${applicationName}`;
+      const prBody = `Automatically created deployment configuration for **${applicationName}**
+
+### Changes
+- Updated \`${deployPath}\` with host configuration
+- Created/Updated GitHub Actions workflow
+
+### Workflow Configuration
+- **Branch**: ${actualBaseBranch}
+- **Secret Name**: \`${secretName}\`
+- **PHP Version**: 8.3
+
+### Server Details
+- **Host**: ${host}
+- **User**: ${username}
+- **Path**: ${sshPath}
+
+### Next Steps
+Ensure the following secrets and variables are set in your repository:
+- \`${secretName}\` - SSH private key (already set if you ran SSH key setup)
+- \`VAULT_ADDR\` - Your Vault address
+- \`VAULT_TOKEN\` - Your Vault token
+- \`VAULT_PATH\` (variable) - Path in Vault`;
+
       const prResp = await gh.post(`/repos/${owner}/${repoName}/pulls`, {
         title: prTitle,
         head: featureBranch,
-        base: baseBranch,
-        body: `This PR updates deploy.yml to configure deployment for ${applicationName}.`,
+        base: actualBaseBranch,
+        body: prBody,
       });
+      logger.info(`[DeployWorkflow] PR created: ${prResp.data?.html_url}`);
 
-      // 7) Log the step with branch info
+      // 8) Log the step with branch info
       await addApplicationStep(
         app.id,
         "deploy-workflow-update",
         "success",
         JSON.stringify({
           repository: `${owner}/${repoName}`,
-          baseBranch,
+          baseBranch: actualBaseBranch,
+          branchCreated,
           featureBranch,
           deployPath,
+          workflowPath,
+          secretName,
           commit: putResp.data?.commit?.sha,
+          workflowCommit: workflowResp.data?.commit?.sha,
           prNumber: prResp.data?.number,
+          prUrl: prResp.data?.html_url,
           duration: Date.now() - startTime,
         })
       );
 
       return res.json({
         success: true,
-        message: "deploy.yml updated and PR created",
+        message: branchCreated
+          ? `Created branch '${actualBaseBranch}' from 'dev', updated deploy.yml, created workflow and opened PR`
+          : "Deployment configuration updated and PR created successfully",
         data: {
           repository: `${owner}/${repoName}`,
-          baseBranch,
+          baseBranch: actualBaseBranch,
+          branchCreated,
           featureBranch,
           deployPath,
+          workflowPath,
+          secretName,
           prNumber: prResp.data?.number,
+          prUrl: prResp.data?.html_url,
         },
       });
     } catch (error: any) {
@@ -4194,3 +4547,458 @@ router.post(
     }
   }
 );
+
+/**
+ * GET /applications
+ * List all applications
+ */
+router.get("/applications", async (req: Request, res: Response) => {
+  try {
+    await ensureDatabaseInitialized();
+    const db =
+      require("../shared/database").getDb?.() ||
+      require("knex")(
+        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+      );
+
+    const applications = await db("applications")
+      .select([
+        "id",
+        "sessionId",
+        "host",
+        "username",
+        "applicationName",
+        "status",
+        "createdAt",
+        "githubUsername",
+        "selectedRepo",
+        "pathname",
+      ])
+      .orderBy("createdAt", "desc");
+
+    logger.info(`[Applications] Retrieved ${applications.length} applications`);
+
+    res.json({
+      success: true,
+      message: `Found ${applications.length} applications`,
+      data: applications.map((app: any) => ({
+        id: app.id,
+        sessionId: app.sessionId,
+        host: app.host,
+        username: app.username,
+        applicationName: app.applicationName,
+        status: app.status,
+        createdAt: app.createdAt,
+        githubUsername: app.githubUsername || null,
+        selectedRepo: app.selectedRepo || null,
+        pathname: app.pathname || null,
+      })),
+    });
+  } catch (error: any) {
+    logger.error(
+      `[Applications] Failed to list applications: ${error.message}`
+    );
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /github/repos
+ * List GitHub repositories for an application using stored token
+ */
+router.get("/github/repos", async (req: Request, res: Response) => {
+  try {
+    const { host, username, applicationName } = req.query as Record<
+      string,
+      string
+    >;
+
+    if (!host || !username || !applicationName) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required query params: host, username, applicationName",
+      });
+    }
+
+    await ensureDatabaseInitialized();
+    const app = await getApplicationByName(host, username, applicationName);
+    if (!app) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Application not found" });
+    }
+
+    if (!app.githubToken) {
+      return res.status(400).json({
+        success: false,
+        error: "GitHub token not set for application",
+      });
+    }
+
+    // Fetch repositories for the authenticated user
+    const response = await axios.get("https://api.github.com/user/repos", {
+      headers: {
+        Authorization: `Bearer ${app.githubToken}`,
+        Accept: "application/vnd.github.v3+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      params: { per_page: 100, sort: "updated" },
+      timeout: 15000,
+    });
+
+    const repos = (response.data || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      full_name: r.full_name,
+      private: !!r.private,
+      html_url: r.html_url,
+      default_branch: r.default_branch,
+      updated_at: r.updated_at,
+    }));
+
+    logger.info(`[GitHub] Listed ${repos.length} repos for ${username}`);
+    res.json({ success: true, data: repos });
+  } catch (error: any) {
+    const msg = error?.response?.data?.message || error.message;
+    logger.error(`[GitHub] Failed to list repos: ${msg}`);
+    res
+      .status(error?.response?.status || 500)
+      .json({ success: false, error: msg });
+  }
+});
+
+/**
+ * POST /applications
+ * Create a new application with connection details
+ */
+router.post("/applications", async (req: Request, res: Response) => {
+  try {
+    const { host, username, port = 22, applicationName } = req.body;
+
+    if (!host || !username || !applicationName) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: host, username, applicationName",
+      });
+    }
+
+    await ensureDatabaseInitialized();
+
+    const sessionId = uuidv4();
+
+    // Save application to database
+    const result = await saveApplication({
+      sessionId,
+      host,
+      username,
+      port,
+      applicationName,
+    });
+
+    logger.info(
+      `[Applications] Created new application: ${applicationName} (ID: ${result.id})`
+    );
+
+    res.json({
+      success: true,
+      message: "Application created",
+      data: {
+        id: result.id,
+        sessionId,
+        host,
+        username,
+        port,
+        applicationName,
+      },
+    });
+  } catch (error: any) {
+    logger.error(
+      `[Applications] Failed to create application: ${error.message}`
+    );
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /applications/:id
+ * Get application details by ID
+ */
+router.get("/applications/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid application ID",
+      });
+    }
+
+    await ensureDatabaseInitialized();
+    const db =
+      require("../shared/database").getDb?.() ||
+      require("knex")(
+        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+      );
+
+    const application = await db("applications")
+      .where({ id: Number(id) })
+      .first();
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        error: "Application not found",
+      });
+    }
+
+    logger.info(
+      `[Applications] Retrieved application: ${application.applicationName}`
+    );
+
+    res.json({
+      success: true,
+      message: "Application retrieved",
+      data: {
+        id: application.id,
+        sessionId: application.sessionId,
+        host: application.host,
+        username: application.username,
+        port: application.port,
+        applicationName: application.applicationName,
+        status: application.status,
+        createdAt: application.createdAt,
+        githubUsername: application.githubUsername || null,
+        githubToken: application.githubToken || null,
+        selectedRepo: application.selectedRepo || null,
+        pathname: application.pathname || null,
+        domain: application.domain || null,
+      },
+    });
+  } catch (error: any) {
+    logger.error(`[Applications] Failed to get application: ${error.message}`);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /applications/:id/select-repo
+ * Persist selected GitHub repository to the application record
+ */
+router.post(
+  "/applications/:id/select-repo",
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { selectedRepo } = req.body || {};
+
+      if (!id || isNaN(Number(id))) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid application ID" });
+      }
+      if (!selectedRepo || typeof selectedRepo !== "string") {
+        return res
+          .status(400)
+          .json({ success: false, error: "'selectedRepo' is required" });
+      }
+
+      await ensureDatabaseInitialized();
+      const db =
+        require("../shared/database").getDb?.() ||
+        require("knex")(
+          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+        );
+
+      const existing = await db("applications")
+        .where({ id: Number(id) })
+        .first();
+      if (!existing) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Application not found" });
+      }
+
+      await db("applications")
+        .where({ id: Number(id) })
+        .update({ selectedRepo });
+
+      // Log step
+      await addApplicationStep(
+        Number(id),
+        "repo-selection",
+        "success",
+        JSON.stringify({ selectedRepo })
+      );
+
+      logger.info(
+        `[Applications] Selected repo updated for app ${id}: ${selectedRepo}`
+      );
+      return res.json({
+        success: true,
+        message: "Repository selection saved",
+        data: { id: Number(id), selectedRepo },
+      });
+    } catch (error: any) {
+      logger.error(
+        `[Applications] Failed to save selected repo: ${error.message}`
+      );
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+/**
+ * POST /applications/:id/database-config
+ * Save database configuration for an application
+ */
+router.post(
+  "/applications/:id/database-config",
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { dbType, dbName, dbUsername, dbPassword, dbPort } = req.body || {};
+
+      if (!id || isNaN(Number(id))) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid application ID" });
+      }
+      if (!dbType || !dbName || !dbUsername) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields: dbType, dbName, dbUsername",
+        });
+      }
+
+      await ensureDatabaseInitialized();
+      const db =
+        require("../shared/database").getDb?.() ||
+        require("knex")(
+          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+        );
+
+      const application = await db("applications")
+        .where({ id: Number(id) })
+        .first();
+      if (!application) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Application not found" });
+      }
+
+      // Save database config in the databases table
+      await db("databases")
+        .insert({
+          applicationId: Number(id),
+          host: application.host,
+          username: application.username,
+          port: application.port || 22,
+          applicationName: application.applicationName,
+          dbType,
+          dbName,
+          dbUsername,
+          dbPassword,
+          dbPort: dbPort || null,
+          status: "configured",
+        })
+        .onConflict(["host", "username", "applicationName", "dbName"])
+        .merge();
+
+      // Log step
+      await addApplicationStep(
+        Number(id),
+        "database-config-save",
+        "success",
+        JSON.stringify({ dbType, dbName })
+      );
+
+      logger.info(
+        `[Applications] Database config saved for app ${id}: ${dbType}/${dbName}`
+      );
+      return res.json({
+        success: true,
+        message: "Database configuration saved",
+        data: { dbType, dbName, dbUsername, dbPort },
+      });
+    } catch (error: any) {
+      logger.error(
+        `[Applications] Failed to save database config: ${error.message}`
+      );
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+/**
+ * GET /applications/:id/database-config
+ * Retrieve database configuration for an application
+ */
+router.get(
+  "/applications/:id/database-config",
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(Number(id))) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid application ID" });
+      }
+
+      await ensureDatabaseInitialized();
+      const db =
+        require("../shared/database").getDb?.() ||
+        require("knex")(
+          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+        );
+
+      const application = await db("applications")
+        .where({ id: Number(id) })
+        .first();
+      if (!application) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Application not found" });
+      }
+
+      // Get the most recent database config
+      const dbConfig = await db("databases")
+        .where({ applicationId: Number(id) })
+        .orderBy("createdAt", "desc")
+        .first();
+
+      if (!dbConfig) {
+        return res.json({ success: true, data: null });
+      }
+
+      logger.info(`[Applications] Retrieved database config for app ${id}`);
+      return res.json({
+        success: true,
+        data: {
+          dbType: dbConfig.dbType,
+          dbName: dbConfig.dbName,
+          dbUsername: dbConfig.dbUsername,
+          dbPassword: dbConfig.dbPassword,
+          dbPort: dbConfig.dbPort,
+        },
+      });
+    } catch (error: any) {
+      logger.error(
+        `[Applications] Failed to get database config: ${error.message}`
+      );
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+);
+
+export default router;

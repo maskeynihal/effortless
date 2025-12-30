@@ -9,14 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as OnboardingWorkflowRouteImport } from './routes/onboarding/workflow'
 import { Route as OnboardingStepsRouteImport } from './routes/onboarding/steps'
+import { Route as OnboardingSetupRouteImport } from './routes/onboarding/setup'
+import { Route as OnboardingSelectRouteImport } from './routes/onboarding/select'
 import { Route as OnboardingPostSetupRouteImport } from './routes/onboarding/post-setup'
+import { Route as OnboardingNewRouteImport } from './routes/onboarding/new'
 import { Route as OnboardingInitRouteImport } from './routes/onboarding/init'
-import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AdminApplicationsRouteImport } from './routes/admin/applications'
+import { Route as OnboardingSetupAppIdRouteImport } from './routes/onboarding/setup.$appId'
 
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -28,8 +39,13 @@ const OnboardingIndexRoute = OnboardingIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: '/admin/',
-  path: '/admin/',
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const OnboardingWorkflowRoute = OnboardingWorkflowRouteImport.update({
+  id: '/onboarding/workflow',
+  path: '/onboarding/workflow',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingStepsRoute = OnboardingStepsRouteImport.update({
@@ -37,9 +53,24 @@ const OnboardingStepsRoute = OnboardingStepsRouteImport.update({
   path: '/onboarding/steps',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingSetupRoute = OnboardingSetupRouteImport.update({
+  id: '/onboarding/setup',
+  path: '/onboarding/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingSelectRoute = OnboardingSelectRouteImport.update({
+  id: '/onboarding/select',
+  path: '/onboarding/select',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingPostSetupRoute = OnboardingPostSetupRouteImport.update({
   id: '/onboarding/post-setup',
   path: '/onboarding/post-setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingNewRoute = OnboardingNewRouteImport.update({
+  id: '/onboarding/new',
+  path: '/onboarding/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingInitRoute = OnboardingInitRouteImport.update({
@@ -47,82 +78,131 @@ const OnboardingInitRoute = OnboardingInitRouteImport.update({
   path: '/onboarding/init',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
-  getParentRoute: () => rootRouteImport,
+const AdminApplicationsRoute = AdminApplicationsRouteImport.update({
+  id: '/applications',
+  path: '/applications',
+  getParentRoute: () => AdminRoute,
+} as any)
+const OnboardingSetupAppIdRoute = OnboardingSetupAppIdRouteImport.update({
+  id: '/$appId',
+  path: '/$appId',
+  getParentRoute: () => OnboardingSetupRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/admin/applications': typeof AdminApplicationsRoute
   '/onboarding/init': typeof OnboardingInitRoute
+  '/onboarding/new': typeof OnboardingNewRoute
   '/onboarding/post-setup': typeof OnboardingPostSetupRoute
+  '/onboarding/select': typeof OnboardingSelectRoute
+  '/onboarding/setup': typeof OnboardingSetupRouteWithChildren
   '/onboarding/steps': typeof OnboardingStepsRoute
-  '/admin': typeof AdminIndexRoute
+  '/onboarding/workflow': typeof OnboardingWorkflowRoute
+  '/admin/': typeof AdminIndexRoute
   '/onboarding': typeof OnboardingIndexRoute
+  '/onboarding/setup/$appId': typeof OnboardingSetupAppIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/admin/applications': typeof AdminApplicationsRoute
   '/onboarding/init': typeof OnboardingInitRoute
+  '/onboarding/new': typeof OnboardingNewRoute
   '/onboarding/post-setup': typeof OnboardingPostSetupRoute
+  '/onboarding/select': typeof OnboardingSelectRoute
+  '/onboarding/setup': typeof OnboardingSetupRouteWithChildren
   '/onboarding/steps': typeof OnboardingStepsRoute
+  '/onboarding/workflow': typeof OnboardingWorkflowRoute
   '/admin': typeof AdminIndexRoute
   '/onboarding': typeof OnboardingIndexRoute
+  '/onboarding/setup/$appId': typeof OnboardingSetupAppIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin/users': typeof AdminUsersRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/admin/applications': typeof AdminApplicationsRoute
   '/onboarding/init': typeof OnboardingInitRoute
+  '/onboarding/new': typeof OnboardingNewRoute
   '/onboarding/post-setup': typeof OnboardingPostSetupRoute
+  '/onboarding/select': typeof OnboardingSelectRoute
+  '/onboarding/setup': typeof OnboardingSetupRouteWithChildren
   '/onboarding/steps': typeof OnboardingStepsRoute
+  '/onboarding/workflow': typeof OnboardingWorkflowRoute
   '/admin/': typeof AdminIndexRoute
   '/onboarding/': typeof OnboardingIndexRoute
+  '/onboarding/setup/$appId': typeof OnboardingSetupAppIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin/users'
-    | '/onboarding/init'
-    | '/onboarding/post-setup'
-    | '/onboarding/steps'
     | '/admin'
+    | '/admin/applications'
+    | '/onboarding/init'
+    | '/onboarding/new'
+    | '/onboarding/post-setup'
+    | '/onboarding/select'
+    | '/onboarding/setup'
+    | '/onboarding/steps'
+    | '/onboarding/workflow'
+    | '/admin/'
     | '/onboarding'
+    | '/onboarding/setup/$appId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin/users'
+    | '/admin/applications'
     | '/onboarding/init'
+    | '/onboarding/new'
     | '/onboarding/post-setup'
+    | '/onboarding/select'
+    | '/onboarding/setup'
     | '/onboarding/steps'
+    | '/onboarding/workflow'
     | '/admin'
     | '/onboarding'
+    | '/onboarding/setup/$appId'
   id:
     | '__root__'
     | '/'
-    | '/admin/users'
+    | '/admin'
+    | '/admin/applications'
     | '/onboarding/init'
+    | '/onboarding/new'
     | '/onboarding/post-setup'
+    | '/onboarding/select'
+    | '/onboarding/setup'
     | '/onboarding/steps'
+    | '/onboarding/workflow'
     | '/admin/'
     | '/onboarding/'
+    | '/onboarding/setup/$appId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminUsersRoute: typeof AdminUsersRoute
+  AdminRoute: typeof AdminRouteWithChildren
   OnboardingInitRoute: typeof OnboardingInitRoute
+  OnboardingNewRoute: typeof OnboardingNewRoute
   OnboardingPostSetupRoute: typeof OnboardingPostSetupRoute
+  OnboardingSelectRoute: typeof OnboardingSelectRoute
+  OnboardingSetupRoute: typeof OnboardingSetupRouteWithChildren
   OnboardingStepsRoute: typeof OnboardingStepsRoute
-  AdminIndexRoute: typeof AdminIndexRoute
+  OnboardingWorkflowRoute: typeof OnboardingWorkflowRoute
   OnboardingIndexRoute: typeof OnboardingIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -139,9 +219,16 @@ declare module '@tanstack/react-router' {
     }
     '/admin/': {
       id: '/admin/'
-      path: '/admin'
-      fullPath: '/admin'
+      path: '/'
+      fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/onboarding/workflow': {
+      id: '/onboarding/workflow'
+      path: '/onboarding/workflow'
+      fullPath: '/onboarding/workflow'
+      preLoaderRoute: typeof OnboardingWorkflowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding/steps': {
@@ -151,11 +238,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingStepsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/setup': {
+      id: '/onboarding/setup'
+      path: '/onboarding/setup'
+      fullPath: '/onboarding/setup'
+      preLoaderRoute: typeof OnboardingSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/select': {
+      id: '/onboarding/select'
+      path: '/onboarding/select'
+      fullPath: '/onboarding/select'
+      preLoaderRoute: typeof OnboardingSelectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding/post-setup': {
       id: '/onboarding/post-setup'
       path: '/onboarding/post-setup'
       fullPath: '/onboarding/post-setup'
       preLoaderRoute: typeof OnboardingPostSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/new': {
+      id: '/onboarding/new'
+      path: '/onboarding/new'
+      fullPath: '/onboarding/new'
+      preLoaderRoute: typeof OnboardingNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding/init': {
@@ -165,25 +273,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingInitRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof rootRouteImport
+    '/admin/applications': {
+      id: '/admin/applications'
+      path: '/applications'
+      fullPath: '/admin/applications'
+      preLoaderRoute: typeof AdminApplicationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/onboarding/setup/$appId': {
+      id: '/onboarding/setup/$appId'
+      path: '/$appId'
+      fullPath: '/onboarding/setup/$appId'
+      preLoaderRoute: typeof OnboardingSetupAppIdRouteImport
+      parentRoute: typeof OnboardingSetupRoute
     }
   }
 }
 
+interface AdminRouteChildren {
+  AdminApplicationsRoute: typeof AdminApplicationsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminApplicationsRoute: AdminApplicationsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface OnboardingSetupRouteChildren {
+  OnboardingSetupAppIdRoute: typeof OnboardingSetupAppIdRoute
+}
+
+const OnboardingSetupRouteChildren: OnboardingSetupRouteChildren = {
+  OnboardingSetupAppIdRoute: OnboardingSetupAppIdRoute,
+}
+
+const OnboardingSetupRouteWithChildren = OnboardingSetupRoute._addFileChildren(
+  OnboardingSetupRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminUsersRoute: AdminUsersRoute,
+  AdminRoute: AdminRouteWithChildren,
   OnboardingInitRoute: OnboardingInitRoute,
+  OnboardingNewRoute: OnboardingNewRoute,
   OnboardingPostSetupRoute: OnboardingPostSetupRoute,
+  OnboardingSelectRoute: OnboardingSelectRoute,
+  OnboardingSetupRoute: OnboardingSetupRouteWithChildren,
   OnboardingStepsRoute: OnboardingStepsRoute,
-  AdminIndexRoute: AdminIndexRoute,
+  OnboardingWorkflowRoute: OnboardingWorkflowRoute,
   OnboardingIndexRoute: OnboardingIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
