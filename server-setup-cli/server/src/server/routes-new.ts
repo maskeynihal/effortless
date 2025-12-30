@@ -4286,13 +4286,8 @@ router.post(
         `[DeployWorkflow] Created feature branch '${featureBranch}' from '${actualBaseBranch}'`
       );
 
-      // 3) Find deploy.yml (common locations)
-      const candidatePaths = [
-        ".github/workflows/deploy.yml",
-        "deploy.yml",
-        ".github/workflows/deploy.yaml",
-        "deploy.yaml",
-      ];
+      // 3) Find deploy.yml (common locations) or create default if not found
+      const candidatePaths = ["deploy.yml", "deploy.yaml"];
       let deployPath: string | null = null;
       let fileSha: string | null = null;
       let fileContent: string | null = null;
@@ -4313,71 +4308,87 @@ router.post(
             deployPath = p;
             fileSha = data.sha;
             fileContent = decoded;
+            logger.info(
+              `[DeployWorkflow] Found existing deploy file at ${deployPath}`
+            );
             break;
           }
         } catch (_) {}
       }
 
-      if (!deployPath || !fileContent) {
-        return res.status(404).json({
-          success: false,
-          error: "deploy.yml not found in repository",
-        });
-      }
-
-      // 4) Update YAML: ensure hosts/application entry exists and update fields
-      let doc: any;
-      try {
-        doc = yaml.load(fileContent) as any;
-      } catch (e: any) {
-        return res.status(400).json({
-          success: false,
-          error: `Invalid YAML in ${deployPath}: ${e?.message || e}`,
-        });
-      }
-
-      // We expect structure like: hosts: [{ application: string, remote_user, hostname, deploy_path, branch, composer_options, npm_build }]
-      if (!doc.hosts) doc.hosts = [];
-      if (!Array.isArray(doc.hosts)) doc.hosts = [doc.hosts];
-
-      const appIndex = doc.hosts.findIndex((h: any) => {
-        const name = h?.application || h?.name || h?.app;
-        return (
-          typeof name === "string" && name.trim() === applicationName.trim()
+      // If deploy.yml doesn't exist, skip it
+      let putResp: any = null;
+      if (deployPath && fileContent && fileSha) {
+        logger.info(
+          `[DeployWorkflow] Found deploy file at ${deployPath}, updating...`
         );
-      });
 
-      const hostEntry = {
-        application: applicationName,
-        remote_user: username,
-        hostname: host,
-        deploy_path: sshPath,
-        branch: baseBranch,
-        composer_options:
-          "--no-dev --optimize-autoloader --prefer-dist --no-interaction --ignore-platform-reqs",
-        npm_build: "build",
-        repository: `git@${hostAlias}:${owner}/${repoName}.git`,
-      };
+        // 4) Update YAML: ensure hosts/application entry exists and update fields
+        let doc: any;
+        try {
+          doc = yaml.load(fileContent) as any;
+        } catch (e: any) {
+          return res.status(400).json({
+            success: false,
+            error: `Invalid YAML in ${deployPath}: ${e?.message || e}`,
+          });
+        }
 
-      if (appIndex >= 0) {
-        doc.hosts[appIndex] = { ...doc.hosts[appIndex], ...hostEntry };
-      } else {
-        doc.hosts.push(hostEntry);
-      }
+        // We expect structure like: hosts: { hostKey: { remote_user, hostname, deploy_path, branch, composer_options, npm_build, repository } }
+        if (!doc.hosts) doc.hosts = {};
+        if (Array.isArray(doc.hosts)) {
+          // Convert array to object if needed
+          const hostsObj: any = {};
+          doc.hosts.forEach((h: any) => {
+            const name =
+              h?.application || h?.name || h?.app || h?.hostname || "host";
+            hostsObj[name] = h;
+          });
+          doc.hosts = hostsObj;
+        }
 
-      const newYaml = yaml.dump(doc, { lineWidth: 120 });
+        // Use applicationName as the host key
+        const hostEntry = {
+          remote_user: username,
+          hostname: host,
+          deploy_path: sshPath,
+          branch: actualBaseBranch,
+          composer_options:
+            "--no-dev --optimize-autoloader --prefer-dist --no-interaction --ignore-platform-reqs",
+          npm_build: "build",
+          repository: `git@${hostAlias}:${owner}/${repoName}.git`,
+        };
 
-      // 5) Commit the change to feature branch via Contents API
-      const putResp = await gh.put(
-        `/repos/${owner}/${repoName}/contents/${encodeURI(deployPath)}`,
-        {
+        // Update or create the host entry using applicationName as key
+        if (doc.hosts[applicationName]) {
+          doc.hosts[applicationName] = {
+            ...doc.hosts[applicationName],
+            ...hostEntry,
+          };
+        } else {
+          doc.hosts[applicationName] = hostEntry;
+        }
+
+        const newYaml = yaml.dump(doc, { lineWidth: 120 });
+
+        // 5) Commit the change to feature branch via Contents API
+        const putPayload: any = {
           message: `chore: update deploy.yml for ${applicationName}`,
           content: Buffer.from(newYaml, "utf-8").toString("base64"),
-          sha: fileSha,
           branch: featureBranch,
-        }
-      );
-      logger.info(`[DeployWorkflow] Updated ${deployPath} on feature branch`);
+          sha: fileSha,
+        };
+
+        putResp = await gh.put(
+          `/repos/${owner}/${repoName}/contents/${encodeURI(deployPath)}`,
+          putPayload
+        );
+        logger.info(`[DeployWorkflow] Updated ${deployPath} on feature branch`);
+      } else {
+        logger.info(
+          `[DeployWorkflow] deploy.yml not found, skipping deploy.yml update`
+        );
+      }
 
       // 6) Create GitHub Actions workflow file
       const secretName: string =
