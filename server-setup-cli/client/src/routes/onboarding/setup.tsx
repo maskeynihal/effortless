@@ -13,7 +13,9 @@ function SetupLayout() {
       <div className="py-12 text-center text-muted-foreground">
         <p>No application selected.</p>
         <p className="mt-2">
-          <Link to="/onboarding" className="underline">Go back to Applications</Link>
+          <Link to="/onboarding" className="underline">
+            Go back to Applications
+          </Link>
         </p>
       </div>
     </div>

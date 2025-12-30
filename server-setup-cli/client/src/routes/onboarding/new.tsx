@@ -1,7 +1,12 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { SessionConfig } from '../../lib/storage'
-import { useVerifyConnection, useCheckGithubToken, useFetchReposFromBackend, useSelectRepo } from '../../lib/queries/useOnboarding'
+import {
+  useVerifyConnection,
+  useCheckGithubToken,
+  useFetchReposFromBackend,
+  useSelectRepo,
+} from '../../lib/queries/useOnboarding'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
@@ -91,7 +96,10 @@ export default function NewApplication() {
 
   const handleSave = () => {
     if (applicationId) {
-      nav({ to: '/onboarding/setup/$appId', params: { appId: String(applicationId) } })
+      nav({
+        to: '/onboarding/setup/$appId',
+        params: { appId: String(applicationId) },
+      })
     } else {
       nav({ to: '/onboarding' })
     }
@@ -127,7 +135,10 @@ export default function NewApplication() {
     if (!applicationId) return
     try {
       setSelectedRepo(fullName)
-      await selectRepoMutation.mutateAsync({ applicationId, selectedRepo: fullName })
+      await selectRepoMutation.mutateAsync({
+        applicationId,
+        selectedRepo: fullName,
+      })
     } catch (e: any) {
       setError(e.message)
     }
@@ -199,9 +210,15 @@ export default function NewApplication() {
 
         <div className="pt-6 space-y-3">
           <h3 className="font-semibold">GitHub Repositories</h3>
-          <p className="text-sm text-muted-foreground">Optionally verify your GitHub token to list repositories.</p>
+          <p className="text-sm text-muted-foreground">
+            Optionally verify your GitHub token to list repositories.
+          </p>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleGithubVerifyAndListRepos} disabled={!config.githubToken}>
+            <Button
+              variant="outline"
+              onClick={handleGithubVerifyAndListRepos}
+              disabled={!config.githubToken}
+            >
               Verify Token & Fetch Repos
             </Button>
           </div>
@@ -215,11 +232,15 @@ export default function NewApplication() {
                 >
                   <div>
                     <div className="text-sm font-medium">{r.full_name}</div>
-                    <div className="text-xs text-muted-foreground">{r.private ? 'Private' : 'Public'}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {r.private ? 'Private' : 'Public'}
+                    </div>
                   </div>
                 </Card>
               ))}
-              <p className="text-xs text-muted-foreground">Showing first 10. Full list will be available in setup step.</p>
+              <p className="text-xs text-muted-foreground">
+                Showing first 10. Full list will be available in setup step.
+              </p>
             </div>
           )}
         </div>
