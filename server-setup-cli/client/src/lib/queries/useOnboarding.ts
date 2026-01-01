@@ -296,6 +296,8 @@ export function useGetApplication(applicationId: number | null) {
         selectedRepo?: string | null
         pathname?: string | null
         domain?: string | null
+        phpVersion?: string | null
+        dbType?: string | null
       }
     },
     enabled: !!applicationId,

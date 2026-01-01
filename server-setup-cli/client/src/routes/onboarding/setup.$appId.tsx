@@ -138,7 +138,7 @@ const STEPS: StepConfig[] = [
 function SetupPage() {
   const { appId } = Route.useParams()
   const nav = useNavigate()
-  const [steps, setSteps] = React.useState<StepConfig[]>(STEPS)
+  const [steps, setSteps] = React.useState<Array<StepConfig>>(STEPS)
   const { data: config } = useGetApplication(Number(appId))
   const { data: dbConfig } = useGetDatabaseConfig(Number(appId))
   const { data: stepLogs = [] } = useStepLogs(
@@ -154,7 +154,6 @@ function SetupPage() {
     },
   )
 
-  console.log({ config, dbConfig, stepLogs })
   const selectRepoMutation = useSelectRepo()
   const saveDatabaseConfig = useSaveDatabaseConfig()
   const [expandedStep, setExpandedStep] = React.useState<string | null>(null)
@@ -171,7 +170,7 @@ function SetupPage() {
     if (dbConfig) {
       setStepConfigs((prev) => ({
         ...prev,
-        database: {
+        'database-create': {
           dbType: dbConfig.dbType,
           dbName: dbConfig.dbName,
           dbUsername: dbConfig.dbUsername,
@@ -188,6 +187,25 @@ function SetupPage() {
       }))
     }
   }, [dbConfig])
+
+  // Prepopulate server stack config when loaded
+  React.useEffect(() => {
+    if (config?.phpVersion || config?.dbType) {
+      setStepConfigs((prev) => ({
+        ...prev,
+        'server-stack-setup': {
+          ...prev['server-stack-setup'],
+          phpVersion: config.phpVersion || '8.3',
+          database:
+            config.dbType === 'MySQL'
+              ? 'mysql'
+              : config.dbType === 'PostgreSQL'
+                ? 'pgsql'
+                : 'mysql',
+        },
+      }))
+    }
+  }, [config?.phpVersion, config?.dbType])
 
   // Update steps with execution status from backend
   React.useEffect(() => {
@@ -553,7 +571,6 @@ function SetupPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* Show if config is needed and not yet filled */}
                 {[
                   'repo-selection',
                   'database-create',
@@ -1034,13 +1051,13 @@ function SetupPage() {
                           stepConfigs['server-stack-setup']?.phpVersion || '8.3'
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'server-stack': {
-                              ...stepConfigs['server-stack-setup'],
+                          setStepConfigs((prevStepConfigs) => ({
+                            ...prevStepConfigs,
+                            'server-stack-setup': {
+                              ...prevStepConfigs['server-stack-setup'],
                               phpVersion: e.target.value,
                             },
-                          })
+                          }))
                         }
                       />
                     </div>
@@ -1050,15 +1067,15 @@ function SetupPage() {
                         value={
                           stepConfigs['server-stack-setup']?.database || 'mysql'
                         }
-                        onValueChange={(val) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'server-stack': {
-                              ...stepConfigs['server-stack-setup'],
+                        onValueChange={(val) => {
+                          setStepConfigs((prevStepConfigs) => ({
+                            ...prevStepConfigs,
+                            'server-stack-setup': {
+                              ...prevStepConfigs['server-stack-setup'],
                               database: val,
                             },
-                          })
-                        }
+                          }))
+                        }}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue />

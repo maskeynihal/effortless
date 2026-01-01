@@ -216,6 +216,31 @@ export async function updatePrivateKeySecretName(
 }
 
 /**
+ * Update PHP version and database type for an application
+ */
+export async function updateStackConfig(
+  host: string,
+  username: string,
+  applicationName: string,
+  phpVersion?: string,
+  dbType?: string
+): Promise<void> {
+  const db = getDb();
+  const updates: any = {};
+  if (phpVersion) updates.phpVersion = phpVersion;
+  if (dbType) updates.dbType = dbType;
+
+  if (Object.keys(updates).length > 0) {
+    logger.info(
+      `[DB] Updating stack config for ${applicationName}: phpVersion=${phpVersion}, dbType=${dbType}`
+    );
+    await db("applications")
+      .where({ host, username, applicationName })
+      .update(updates);
+  }
+}
+
+/**
  * LEGACY: updateSessionStatus - redirects to updateApplicationStatus
  */
 export async function updateSessionStatus(

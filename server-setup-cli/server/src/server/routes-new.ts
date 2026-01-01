@@ -673,7 +673,8 @@ router.post("/step/database-create", async (req: Request, res: Response) => {
     if (dbType === "MySQL") {
       createDbCommand = `sudo mysql -e "CREATE DATABASE IF NOT EXISTS \\\`${dbName}\\\`; CREATE USER IF NOT EXISTS '${dbUsername}'@'localhost' IDENTIFIED BY '${dbPassword}'; GRANT ALL PRIVILEGES ON \\\`${dbName}\\\`.* TO '${dbUsername}'@'localhost'; FLUSH PRIVILEGES;"`;
     } else if (dbType === "PostgreSQL") {
-      createDbCommand = `sudo -u postgres createdb ${dbName} 2>/dev/null || true; sudo -u postgres psql -c "CREATE USER ${dbUsername} WITH PASSWORD '${dbPassword}';" 2>/dev/null || true; sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${dbUsername};"`;
+      // Create user with superuser-like privileges for the database
+      createDbCommand = `sudo -u postgres psql -c "DO \\$\\$ BEGIN IF NOT EXISTS (SELECT FROM pg_user WHERE usename = '${dbUsername}') THEN CREATE USER ${dbUsername} WITH PASSWORD '${dbPassword}'; END IF; END \\$\\$;" && sudo -u postgres psql -c "SELECT 1 FROM pg_database WHERE datname = '${dbName}'" | grep -q 1 || sudo -u postgres createdb ${dbName} && sudo -u postgres psql -c "ALTER DATABASE ${dbName} OWNER TO ${dbUsername};" && sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${dbUsername};" && sudo -u postgres psql -d ${dbName} -c "GRANT ALL ON SCHEMA public TO ${dbUsername};" && sudo -u postgres psql -d ${dbName} -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${dbUsername};" && sudo -u postgres psql -d ${dbName} -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${dbUsername};" && sudo -u postgres psql -d ${dbName} -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${dbUsername};" && sudo -u postgres psql -d ${dbName} -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ${dbUsername};"`;
     }
 
     let stdout = "";
@@ -3783,6 +3784,16 @@ router.post(
       ssh.end();
       logger.info("[LaravelStack] SSH session closed");
 
+      // Save PHP version and database type to application record
+      const { updateStackConfig } = require("../shared/database");
+      await updateStackConfig(
+        host,
+        username,
+        applicationName,
+        phpVersion,
+        dbType
+      );
+
       // Log success
       await addApplicationStep(
         app.id,
@@ -4790,6 +4801,8 @@ router.get("/applications/:id", async (req: Request, res: Response) => {
         selectedRepo: application.selectedRepo || null,
         pathname: application.pathname || null,
         domain: application.domain || null,
+        phpVersion: application.phpVersion || null,
+        dbType: application.dbType || null,
       },
     });
   } catch (error: any) {
