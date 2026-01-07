@@ -82,14 +82,13 @@ function RootApp() {
                 <Link
                   to="/onboarding"
                   className="text-sm text-muted-foreground hover:text-foreground transition"
+                  activeProps={{
+                    className:
+                      'text-sm font-medium transition underline underline-offset-4 font-extrabold',
+                  }}
+                  activeOptions={{ exact: false }}
                 >
                   Applications
-                </Link>
-                <Link
-                  to="/admin"
-                  className="text-sm text-muted-foreground hover:text-foreground transition"
-                >
-                  Admin
                 </Link>
               </nav>
             </div>
