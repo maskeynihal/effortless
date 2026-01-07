@@ -1,0 +1,16 @@
+# Livewire asset and message handling for Laravel Livewire
+# Serve Livewire JS and route message endpoints through index.php so PHP can
+# handle component messages and actions.
+
+# Serve the Livewire javascript and other livewire static endpoints with
+# long cache lifetime (immutable) when available as static files.
+location ^~ /livewire {
+	try_files $uri $uri/ /index.php?$query_string;
+	add_header Cache-Control "public, max-age=31536000, immutable";
+	access_log off;
+}
+
+# Explicitly route Livewire message endpoints to PHP for processing.
+location ~ ^/livewire/message {
+	try_files $uri /index.php?$query_string;
+}

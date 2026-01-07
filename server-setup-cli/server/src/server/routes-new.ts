@@ -15,7 +15,6 @@ import {
   getApplicationSteps,
   updateApplicationStatus,
   updatePrivateKeySecretName,
-  updateApplicationSetupPathname,
 } from "../shared/database";
 import { SSHConnectionStep } from "../steps/sshConnectionStep";
 import { GitHubAuthStep } from "../steps/githubAuthStep";
@@ -2184,15 +2183,15 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
     logger.info("[ServerStack] Installing Nginx");
     if (pkgMgr === "apt") {
       await execWithTimeout(
-        "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq nginx",
-        "install nginx",
+        "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq nginx acl",
+        "install nginx and acl",
         240000,
         false
       );
     } else {
       await execWithTimeout(
-        `sudo -n ${pkgMgr} install -y -q nginx`,
-        "install nginx",
+        `sudo -n ${pkgMgr} install -y -q nginx acl`,
+        "install nginx and acl",
         240000,
         false
       );
@@ -2722,6 +2721,16 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       false
     );
     processLog.push("✅ PHP FastCGI configuration written");
+
+    // Load and write Livewire snippet (if present)
+    const livewireConf = await loadTemplate("livewire.conf");
+    await execWithTimeout(
+      `cat <<'EOF_LW' | sudo -n tee /etc/nginx/nginxconfig.io/livewire.conf > /dev/null\n${livewireConf}\nEOF_LW`,
+      "write livewire snippet",
+      15000,
+      false
+    );
+    processLog.push("✅ Livewire configuration written");
 
     // Load and write Let's Encrypt snippet
     const letsencryptConf = await loadTemplate("letsencrypt.conf");

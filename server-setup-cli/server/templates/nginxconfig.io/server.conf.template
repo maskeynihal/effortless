@@ -32,6 +32,8 @@ server {
 
     # additional config
     include nginxconfig.io/general.conf;
+    # Livewire-specific routing and assets
+    include nginxconfig.io/livewire.conf;
 
     # handle .php
     location ~ \.php$ {

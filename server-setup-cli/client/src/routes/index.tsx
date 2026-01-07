@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
@@ -26,19 +25,6 @@ function Home() {
           </p>
           <Link to="/onboarding">
             <Button className="w-full">Manage Applications</Button>
-          </Link>
-        </Card>
-
-        <Card className="p-6 space-y-4">
-          <h2 className="text-2xl font-bold">Admin Tools</h2>
-          <p className="text-muted-foreground">
-            View execution logs, manage admin users, and monitor deployment
-            status.
-          </p>
-          <Link to="/admin">
-            <Button className="w-full" variant="outline">
-              Admin Dashboard
-            </Button>
           </Link>
         </Card>
       </div>
