@@ -165,6 +165,20 @@ function SetupPage() {
     config?.selectedRepo || '',
   )
 
+  // Helper callback to update step configuration
+  const updateStepConfig = React.useCallback(
+    (stepId: string, updates: Record<string, any>) => {
+      setStepConfigs((prev) => ({
+        ...prev,
+        [stepId]: {
+          ...prev[stepId],
+          ...updates,
+        },
+      }))
+    },
+    [],
+  )
+
   // Prepopulate database config when loaded
   React.useEffect(() => {
     if (dbConfig) {
@@ -670,15 +684,14 @@ function SetupPage() {
                           value={
                             stepConfigs['database-create']?.dbType || 'MySQL'
                           }
-                          onValueChange={(val) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              database: {
-                                ...stepConfigs['database-create'],
-                                dbType: val,
-                              },
+                          onValueChange={(val) => {
+                            const defaultPort =
+                              val === 'PostgreSQL' ? 5432 : 3306
+                            updateStepConfig('database-create', {
+                              dbType: val,
+                              dbPort: defaultPort,
                             })
-                          }
+                          }}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue />
@@ -696,17 +709,27 @@ function SetupPage() {
                         <div className="flex gap-2">
                           <Input
                             type="number"
-                            placeholder="3306"
+                            placeholder={
+                              stepConfigs['database-create']?.dbType ===
+                              'PostgreSQL'
+                                ? '5432'
+                                : '3306'
+                            }
                             value={
-                              stepConfigs['database-create']?.dbPort || 3306
+                              stepConfigs['database-create']?.dbPort ||
+                              (stepConfigs['database-create']?.dbType ===
+                              'PostgreSQL'
+                                ? 5432
+                                : 3306)
                             }
                             onChange={(e) =>
-                              setStepConfigs({
-                                ...stepConfigs,
-                                database: {
-                                  ...stepConfigs['database-create'],
-                                  dbPort: parseInt(e.target.value) || 3306,
-                                },
+                              updateStepConfig('database-create', {
+                                dbPort:
+                                  parseInt(e.target.value) ||
+                                  (stepConfigs['database-create']?.dbType ===
+                                  'PostgreSQL'
+                                    ? 5432
+                                    : 3306),
                               })
                             }
                             className="flex-1"
@@ -719,7 +742,10 @@ function SetupPage() {
                               copyToClipboard(
                                 String(
                                   stepConfigs['database-create']?.dbPort ||
-                                    3306,
+                                    (stepConfigs['database-create']?.dbType ===
+                                    'PostgreSQL'
+                                      ? 5432
+                                      : 3306),
                                 ),
                               )
                             }
@@ -739,12 +765,8 @@ function SetupPage() {
                             config?.applicationName
                           }
                           onChange={(e) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              database: {
-                                ...stepConfigs['database-create'],
-                                dbName: e.target.value,
-                              },
+                            updateStepConfig('database-create', {
+                              dbName: e.target.value,
                             })
                           }
                           className="flex-1"
@@ -775,12 +797,8 @@ function SetupPage() {
                             `${config?.applicationName}_user`
                           }
                           onChange={(e) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              database: {
-                                ...stepConfigs['database-create'],
-                                dbUsername: e.target.value,
-                              },
+                            updateStepConfig('database-create', {
+                              dbUsername: e.target.value,
                             })
                           }
                           className="flex-1"
@@ -815,12 +833,8 @@ function SetupPage() {
                             stepConfigs['database-create']?.dbPassword || ''
                           }
                           onChange={(e) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              database: {
-                                ...stepConfigs['database-create'],
-                                dbPassword: e.target.value,
-                              },
+                            updateStepConfig('database-create', {
+                              dbPassword: e.target.value,
                             })
                           }
                           className="flex-1"
@@ -864,15 +878,14 @@ function SetupPage() {
                         <Label className="text-xs">Database Type</Label>
                         <Select
                           value={stepConfigs['env-update']?.dbType || 'MySQL'}
-                          onValueChange={(val) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              'env-update': {
-                                ...stepConfigs['env-update'],
-                                dbType: val,
-                              },
+                          onValueChange={(val) => {
+                            const defaultPort =
+                              val === 'PostgreSQL' ? 5432 : 3306
+                            updateStepConfig('env-update', {
+                              dbType: val,
+                              dbPort: defaultPort,
                             })
-                          }
+                          }}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue />
@@ -890,15 +903,26 @@ function SetupPage() {
                         <div className="flex gap-2">
                           <Input
                             type="number"
-                            placeholder="3306"
-                            value={stepConfigs['env-update']?.dbPort || 3306}
+                            placeholder={
+                              stepConfigs['env-update']?.dbType === 'PostgreSQL'
+                                ? '5432'
+                                : '3306'
+                            }
+                            value={
+                              stepConfigs['env-update']?.dbPort ||
+                              (stepConfigs['env-update']?.dbType ===
+                              'PostgreSQL'
+                                ? 5432
+                                : 3306)
+                            }
                             onChange={(e) =>
-                              setStepConfigs({
-                                ...stepConfigs,
-                                'env-update': {
-                                  ...stepConfigs['env-update'],
-                                  dbPort: parseInt(e.target.value) || 3306,
-                                },
+                              updateStepConfig('env-update', {
+                                dbPort:
+                                  parseInt(e.target.value) ||
+                                  (stepConfigs['env-update']?.dbType ===
+                                  'PostgreSQL'
+                                    ? 5432
+                                    : 3306),
                               })
                             }
                             className="flex-1"
@@ -910,7 +934,11 @@ function SetupPage() {
                             onClick={() =>
                               copyToClipboard(
                                 String(
-                                  stepConfigs['env-update']?.dbPort || 3306,
+                                  stepConfigs['env-update']?.dbPort ||
+                                    (stepConfigs['env-update']?.dbType ===
+                                    'PostgreSQL'
+                                      ? 5432
+                                      : 3306),
                                 ),
                               )
                             }
@@ -930,12 +958,8 @@ function SetupPage() {
                             config?.applicationName
                           }
                           onChange={(e) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              'env-update': {
-                                ...stepConfigs['env-update'],
-                                dbName: e.target.value,
-                              },
+                            updateStepConfig('env-update', {
+                              dbName: e.target.value,
                             })
                           }
                           className="flex-1"
@@ -966,12 +990,8 @@ function SetupPage() {
                             `${config?.applicationName}_user`
                           }
                           onChange={(e) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              'env-update': {
-                                ...stepConfigs['env-update'],
-                                dbUsername: e.target.value,
-                              },
+                            updateStepConfig('env-update', {
+                              dbUsername: e.target.value,
                             })
                           }
                           className="flex-1"
@@ -1000,12 +1020,8 @@ function SetupPage() {
                           placeholder="Enter database password"
                           value={stepConfigs['env-update']?.dbPassword || ''}
                           onChange={(e) =>
-                            setStepConfigs({
-                              ...stepConfigs,
-                              'env-update': {
-                                ...stepConfigs['env-update'],
-                                dbPassword: e.target.value,
-                              },
+                            updateStepConfig('env-update', {
+                              dbPassword: e.target.value,
                             })
                           }
                           className="flex-1"
@@ -1051,13 +1067,9 @@ function SetupPage() {
                           stepConfigs['server-stack-setup']?.phpVersion || '8.3'
                         }
                         onChange={(e) =>
-                          setStepConfigs((prevStepConfigs) => ({
-                            ...prevStepConfigs,
-                            'server-stack-setup': {
-                              ...prevStepConfigs['server-stack-setup'],
-                              phpVersion: e.target.value,
-                            },
-                          }))
+                          updateStepConfig('server-stack-setup', {
+                            phpVersion: e.target.value,
+                          })
                         }
                       />
                     </div>
@@ -1068,13 +1080,9 @@ function SetupPage() {
                           stepConfigs['server-stack-setup']?.database || 'mysql'
                         }
                         onValueChange={(val) => {
-                          setStepConfigs((prevStepConfigs) => ({
-                            ...prevStepConfigs,
-                            'server-stack-setup': {
-                              ...prevStepConfigs['server-stack-setup'],
-                              database: val,
-                            },
-                          }))
+                          updateStepConfig('server-stack-setup', {
+                            database: val,
+                          })
                         }}
                       >
                         <SelectTrigger className="w-full">
@@ -1100,12 +1108,8 @@ function SetupPage() {
                           stepConfigs['node-nvm-setup']?.nodeVersion || '20'
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'node-nvm': {
-                              ...stepConfigs['node-nvm-setup'],
-                              nodeVersion: e.target.value,
-                            },
+                          updateStepConfig('node-nvm-setup', {
+                            nodeVersion: e.target.value,
                           })
                         }
                       />
@@ -1126,12 +1130,8 @@ function SetupPage() {
                           `${config?.applicationName}.local`
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'https-nginx-setup': {
-                              ...stepConfigs['https-nginx-setup'],
-                              domain: e.target.value,
-                            },
+                          updateStepConfig('https-nginx-setup', {
+                            domain: e.target.value,
                           })
                         }
                       />
@@ -1146,12 +1146,8 @@ function SetupPage() {
                           'admin@example.com'
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'https-nginx-setup': {
-                              ...stepConfigs['https-nginx-setup'],
-                              email: e.target.value,
-                            },
+                          updateStepConfig('https-nginx-setup', {
+                            email: e.target.value,
                           })
                         }
                       />
@@ -1173,12 +1169,8 @@ function SetupPage() {
                           ''
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'deploy-workflow-update': {
-                              ...stepConfigs['deploy-workflow-update'],
-                              selectedRepo: e.target.value,
-                            },
+                          updateStepConfig('deploy-workflow-update', {
+                            selectedRepo: e.target.value,
                           })
                         }
                       />
@@ -1195,12 +1187,8 @@ function SetupPage() {
                           `/var/www/${config?.applicationName || 'app'}`
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'deploy-workflow-update': {
-                              ...stepConfigs['deploy-workflow-update'],
-                              sshPath: e.target.value,
-                            },
+                          updateStepConfig('deploy-workflow-update', {
+                            sshPath: e.target.value,
                           })
                         }
                       />
@@ -1216,12 +1204,8 @@ function SetupPage() {
                           ''
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'deploy-workflow-update': {
-                              ...stepConfigs['deploy-workflow-update'],
-                              githubToken: e.target.value,
-                            },
+                          updateStepConfig('deploy-workflow-update', {
+                            githubToken: e.target.value,
                           })
                         }
                       />
@@ -1235,12 +1219,8 @@ function SetupPage() {
                           ''
                         }
                         onChange={(e) =>
-                          setStepConfigs({
-                            ...stepConfigs,
-                            'deploy-workflow-update': {
-                              ...stepConfigs['deploy-workflow-update'],
-                              baseBranch: e.target.value,
-                            },
+                          updateStepConfig('deploy-workflow-update', {
+                            baseBranch: e.target.value,
                           })
                         }
                       />
