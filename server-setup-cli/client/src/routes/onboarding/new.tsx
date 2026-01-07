@@ -123,7 +123,7 @@ export default function NewApplication() {
         username: config.username,
         applicationName: config.applicationName,
       })
-      setRepos(list || [])
+      setRepos(list)
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -132,7 +132,7 @@ export default function NewApplication() {
   }
 
   const handleSelectRepo = async (fullName: string) => {
-    if (!applicationId) return
+    if (applicationId === null) return
     try {
       setSelectedRepo(fullName)
       await selectRepoMutation.mutateAsync({

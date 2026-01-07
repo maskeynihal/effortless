@@ -1,11 +1,13 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useGetApplication,
+import {
+  useGetApplication,
   useGetDatabaseConfig,
   useListReposFromBackend,
   useSaveDatabaseConfig,
   useSelectRepo,
-  useStepLogs } from '../../lib/queries/useOnboarding'
+  useStepLogs,
+} from '../../lib/queries/useOnboarding'
 import { apiService } from '../../lib/api-service'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -273,7 +275,7 @@ function SetupPage() {
       case 'https-nginx-setup':
         return !!(conf?.domain && conf?.email)
       case 'deploy-workflow-update':
-        return !!config.githubToken
+        return !!config?.githubToken
       default:
         return true
     }
@@ -298,12 +300,7 @@ function SetupPage() {
 
   const executeStep = async (stepId: string) => {
     // Guard: ensure config is loaded before executing
-    if (
-      !config ||
-      !config.host ||
-      !config.username ||
-      !config.applicationName
-    ) {
+    if (!config.host || !config.username || !config.applicationName) {
       alert('Application configuration is loading. Please wait...')
       return
     }
@@ -352,13 +349,14 @@ function SetupPage() {
           break
         }
         case 'database-create': {
-          const dbConfig = stepConfigs['database-create'] || {}
+          const stepDbConfig = stepConfigs['database-create'] || {}
           const params = {
-            dbType: dbConfig.dbType || 'MySQL',
-            dbName: dbConfig.dbName || config.applicationName,
-            dbUsername: dbConfig.dbUsername || `${config.applicationName}_user`,
-            dbPassword: dbConfig.dbPassword || '',
-            dbPort: dbConfig.dbPort || 3306,
+            dbType: stepDbConfig.dbType || 'MySQL',
+            dbName: stepDbConfig.dbName || config.applicationName,
+            dbUsername:
+              stepDbConfig.dbUsername || `${config.applicationName}_user`,
+            dbPassword: stepDbConfig.dbPassword || '',
+            dbPort: stepDbConfig.dbPort || 3306,
           }
           response = await apiService.databaseCreate({
             ...baseParams,
@@ -487,7 +485,7 @@ function SetupPage() {
       setExpandedStep(null)
 
       // After database step succeeds, save config to backend
-      if (stepId === 'database-create') {
+      if (stepId === 'database-create' && stepConfigs['database-create']) {
         const params = stepConfigs['database-create']
         try {
           await saveDatabaseConfig.mutateAsync({
@@ -541,9 +539,7 @@ function SetupPage() {
       <div>
         <h2 className="text-2xl font-bold">Setup Steps</h2>
         <p className="text-muted-foreground mt-2">
-          {config
-            ? `${config.applicationName} on ${config.username}@${config.host}`
-            : ''}
+          {config.applicationName} on {config.username}@{config.host}
         </p>
       </div>
 
@@ -654,10 +650,14 @@ function SetupPage() {
                       ) : (
                         <Select
                           value={selectedRepoLocal}
-                          onValueChange={setSelectedRepoLocal}
+                          onValueChange={(value) => {
+                            if (value !== null) {
+                              setSelectedRepoLocal(value)
+                            }
+                          }}
                         >
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select a repository" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {repos.map((repo: any) => (
@@ -760,7 +760,7 @@ function SetupPage() {
                           placeholder="Database name"
                           value={
                             stepConfigs['database-create']?.dbName ||
-                            config?.applicationName
+                            config.applicationName
                           }
                           onChange={(e) =>
                             updateStepConfig('database-create', {
@@ -776,7 +776,7 @@ function SetupPage() {
                           onClick={() =>
                             copyToClipboard(
                               stepConfigs['database-create']?.dbName ||
-                                config?.applicationName ||
+                                config.applicationName ||
                                 '',
                             )
                           }
@@ -792,7 +792,7 @@ function SetupPage() {
                           placeholder="Database user"
                           value={
                             stepConfigs['database-create']?.dbUsername ||
-                            `${config?.applicationName}_user`
+                            `${config.applicationName}_user`
                           }
                           onChange={(e) =>
                             updateStepConfig('database-create', {
@@ -808,7 +808,7 @@ function SetupPage() {
                           onClick={() =>
                             copyToClipboard(
                               stepConfigs['database-create']?.dbUsername ||
-                                `${config?.applicationName}_user` ||
+                                `${config.applicationName}_user` ||
                                 '',
                             )
                           }
@@ -962,7 +962,7 @@ function SetupPage() {
                           value={
                             stepConfigs['env-update']?.dbName ||
                             stepConfigs['database-create']?.dbName ||
-                            config?.applicationName
+                            config.applicationName
                           }
                           onChange={(e) =>
                             updateStepConfig('env-update', {
@@ -979,7 +979,7 @@ function SetupPage() {
                             copyToClipboard(
                               stepConfigs['env-update']?.dbName ||
                                 stepConfigs['database-create']?.dbName ||
-                                config?.applicationName ||
+                                config.applicationName ||
                                 '',
                             )
                           }
@@ -996,7 +996,7 @@ function SetupPage() {
                           value={
                             stepConfigs['env-update']?.dbUsername ||
                             stepConfigs['database-create']?.dbUsername ||
-                            `${config?.applicationName}_user`
+                            `${config.applicationName}_user`
                           }
                           onChange={(e) =>
                             updateStepConfig('env-update', {
@@ -1013,7 +1013,7 @@ function SetupPage() {
                             copyToClipboard(
                               stepConfigs['env-update']?.dbUsername ||
                                 stepConfigs['database-create']?.dbUsername ||
-                                `${config?.applicationName}_user` ||
+                                `${config.applicationName}_user` ||
                                 '',
                             )
                           }
@@ -1142,8 +1142,8 @@ function SetupPage() {
                         placeholder="example.com"
                         value={
                           stepConfigs['https-nginx-setup']?.domain ||
-                          config?.domain ||
-                          `${config?.applicationName}.local`
+                          config.domain ||
+                          `${config.applicationName}.local`
                         }
                         onChange={(e) =>
                           updateStepConfig('https-nginx-setup', {
@@ -1181,7 +1181,7 @@ function SetupPage() {
                         value={
                           stepConfigs['deploy-workflow-update']?.selectedRepo ||
                           selectedRepoLocal ||
-                          config?.selectedRepo ||
+                          config.selectedRepo ||
                           ''
                         }
                         onChange={(e) =>
@@ -1199,8 +1199,8 @@ function SetupPage() {
                         placeholder="/var/www/myapp"
                         value={
                           stepConfigs['deploy-workflow-update']?.sshPath ||
-                          config?.pathname ||
-                          `/var/www/${config?.applicationName || 'app'}`
+                          config.pathname ||
+                          `/var/www/${config.applicationName || 'app'}`
                         }
                         onChange={(e) =>
                           updateStepConfig('deploy-workflow-update', {
@@ -1216,7 +1216,7 @@ function SetupPage() {
                         placeholder="ghp_xxxxxxxxxxxx"
                         value={
                           stepConfigs['deploy-workflow-update']?.githubToken ||
-                          config?.githubToken ||
+                          config.githubToken ||
                           ''
                         }
                         onChange={(e) =>

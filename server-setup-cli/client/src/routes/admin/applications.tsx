@@ -18,7 +18,7 @@ function ApplicationsPage() {
     loadApplications()
   }, [])
 
-  const loadApplications = async () => {
+  const loadApplications = () => {
     setLoading(true)
     setError(null)
     try {

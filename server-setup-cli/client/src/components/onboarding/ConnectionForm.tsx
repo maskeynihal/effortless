@@ -1,7 +1,7 @@
 import * as React from 'react'
 import type { useForm } from '@tanstack/react-form'
 import type { FormValues } from '@/lib/types/onboarding'
-import type {Connections} from '@/lib/queries/useOnboarding';
+import type { Connections } from '@/lib/queries/useOnboarding'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -12,10 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { TextField } from '@/components/inputs/TextField'
-import {
-  
-  useVerifyConnection
-} from '@/lib/queries/useOnboarding'
+import { useVerifyConnection } from '@/lib/queries/useOnboarding'
 
 interface ConnectionFormProps {
   form: ReturnType<typeof useForm<FormValues>>
@@ -89,7 +86,7 @@ export function ConnectionForm({ form, onVerified }: ConnectionFormProps) {
               githubToken: v.githubToken || undefined,
               applicationName: v.applicationName,
             })
-            if (result?.sessionId) {
+            if (result.sessionId) {
               form.setFieldValue('sessionId', result.sessionId)
             }
             onVerified?.(result)
