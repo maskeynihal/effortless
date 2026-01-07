@@ -877,7 +877,11 @@ function SetupPage() {
                       <div>
                         <Label className="text-xs">Database Type</Label>
                         <Select
-                          value={stepConfigs['env-update']?.dbType || 'MySQL'}
+                          value={
+                            stepConfigs['env-update']?.dbType ||
+                            stepConfigs['database-create']?.dbType ||
+                            'MySQL'
+                          }
                           onValueChange={(val) => {
                             const defaultPort =
                               val === 'PostgreSQL' ? 5432 : 3306
@@ -904,13 +908,17 @@ function SetupPage() {
                           <Input
                             type="number"
                             placeholder={
-                              stepConfigs['env-update']?.dbType === 'PostgreSQL'
+                              (stepConfigs['env-update']?.dbType ||
+                                stepConfigs['database-create']?.dbType) ===
+                              'PostgreSQL'
                                 ? '5432'
                                 : '3306'
                             }
                             value={
                               stepConfigs['env-update']?.dbPort ||
-                              (stepConfigs['env-update']?.dbType ===
+                              stepConfigs['database-create']?.dbPort ||
+                              ((stepConfigs['env-update']?.dbType ||
+                                stepConfigs['database-create']?.dbType) ===
                               'PostgreSQL'
                                 ? 5432
                                 : 3306)
@@ -955,6 +963,7 @@ function SetupPage() {
                           placeholder="Database name"
                           value={
                             stepConfigs['env-update']?.dbName ||
+                            stepConfigs['database-create']?.dbName ||
                             config?.applicationName
                           }
                           onChange={(e) =>
@@ -971,6 +980,7 @@ function SetupPage() {
                           onClick={() =>
                             copyToClipboard(
                               stepConfigs['env-update']?.dbName ||
+                                stepConfigs['database-create']?.dbName ||
                                 config?.applicationName ||
                                 '',
                             )
@@ -987,6 +997,7 @@ function SetupPage() {
                           placeholder="Database user"
                           value={
                             stepConfigs['env-update']?.dbUsername ||
+                            stepConfigs['database-create']?.dbUsername ||
                             `${config?.applicationName}_user`
                           }
                           onChange={(e) =>
@@ -1003,6 +1014,7 @@ function SetupPage() {
                           onClick={() =>
                             copyToClipboard(
                               stepConfigs['env-update']?.dbUsername ||
+                                stepConfigs['database-create']?.dbUsername ||
                                 `${config?.applicationName}_user` ||
                                 '',
                             )
@@ -1018,7 +1030,11 @@ function SetupPage() {
                         <Input
                           type={showPasswords['env-pwd'] ? 'text' : 'password'}
                           placeholder="Enter database password"
-                          value={stepConfigs['env-update']?.dbPassword || ''}
+                          value={
+                            stepConfigs['env-update']?.dbPassword ||
+                            stepConfigs['database-create']?.dbPassword ||
+                            ''
+                          }
                           onChange={(e) =>
                             updateStepConfig('env-update', {
                               dbPassword: e.target.value,
@@ -1045,7 +1061,9 @@ function SetupPage() {
                           size="sm"
                           onClick={() =>
                             copyToClipboard(
-                              stepConfigs['env-update']?.dbPassword || '',
+                              stepConfigs['env-update']?.dbPassword ||
+                                stepConfigs['database-create']?.dbPassword ||
+                                '',
                             )
                           }
                         >
