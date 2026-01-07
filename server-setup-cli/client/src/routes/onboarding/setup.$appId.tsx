@@ -1,13 +1,11 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useGetApplication } from '../../lib/queries/useOnboarding'
-import {
+import { useGetApplication,
   useGetDatabaseConfig,
-  useSaveDatabaseConfig,
-  useStepLogs,
   useListReposFromBackend,
+  useSaveDatabaseConfig,
   useSelectRepo,
-} from '../../lib/queries/useOnboarding'
+  useStepLogs } from '../../lib/queries/useOnboarding'
 import { apiService } from '../../lib/api-service'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -36,7 +34,7 @@ interface StepConfig {
   executedAt?: string
 }
 
-const STEPS: StepConfig[] = [
+const STEPS: Array<StepConfig> = [
   {
     id: 'connection-verify',
     name: 'Connection Verification',

@@ -13,7 +13,7 @@ export const Route = createFileRoute('/admin/')({
 function Admin() {
   const [host, setHost] = React.useState('')
   const [username, setUsername] = React.useState('')
-  const [adminUsers, setAdminUsers] = React.useState<any[]>([])
+  const [adminUsers, setAdminUsers] = React.useState<Array<any>>([])
   const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)

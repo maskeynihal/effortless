@@ -14,7 +14,7 @@ export default function AdminPage() {
   const [host, setHost] = React.useState('')
   const [username, setUsername] = React.useState('')
   const [applicationName, setApplicationName] = React.useState('')
-  const [logs, setLogs] = React.useState<any[]>([])
+  const [logs, setLogs] = React.useState<Array<any>>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 

@@ -40,7 +40,7 @@ export default function Onboarding() {
       {loading && (
         <div className="text-muted-foreground">Loading applications...</div>
       )}
-      {error && <div className="text-red-600">{(error as Error).message}</div>}
+      {error && <div className="text-red-600">{(error).message}</div>}
       {!loading && apps.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-semibold text-lg">Saved Applications</h3>

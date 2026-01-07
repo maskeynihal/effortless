@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import axios from 'axios'
-import { api, API_URL } from '../api'
+import { API_URL, api } from '../api'
 
 type Connections = {
   ssh?: {
@@ -84,7 +84,7 @@ export function useLoadRepositories() {
       const repos = (data as Array<{ full_name?: string }>)
         .map((r) => r.full_name)
         .filter(Boolean)
-      return repos as string[]
+      return repos as Array<string>
     },
   })
 }
@@ -240,7 +240,7 @@ export function useStepLogs(
       const { data } = await api.get(
         `/steps/${encodeURIComponent(host)}/${encodeURIComponent(username)}/${encodeURIComponent(applicationName)}`,
       )
-      return (data?.success ? data.steps : []) as StepLog[]
+      return (data?.success ? data.steps : []) as Array<StepLog>
     },
     enabled: Boolean(host && username && applicationName),
     refetchInterval: 5000,

@@ -1,16 +1,16 @@
 import * as React from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/admin/applications')({
   component: ApplicationsPage,
 })
 
 function ApplicationsPage() {
-  const [applications, setApplications] = React.useState<any[]>([])
+  const [applications, setApplications] = React.useState<Array<any>>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [selectedApp, setSelectedApp] = React.useState<any | null>(null)
-  const [appSteps, setAppSteps] = React.useState<any[]>([])
+  const [appSteps, setAppSteps] = React.useState<Array<any>>([])
 
   React.useEffect(() => {
     // In a real implementation, this would fetch from the API
@@ -69,9 +69,13 @@ function ApplicationsPage() {
         {/* Applications List */}
         <div className="lg:col-span-1">
           <div className="rounded-lg border p-4">
-            <h3 className="font-semibold mb-4">Applications ({applications.length})</h3>
+            <h3 className="font-semibold mb-4">
+              Applications ({applications.length})
+            </h3>
             {loading ? (
-              <div className="text-center py-4 text-muted-foreground">Loading...</div>
+              <div className="text-center py-4 text-muted-foreground">
+                Loading...
+              </div>
             ) : applications.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground text-sm">
                 <p>No applications found</p>
@@ -94,8 +98,12 @@ function ApplicationsPage() {
                         : 'hover:bg-accent'
                     }`}
                   >
-                    <div className="font-medium text-sm">{app.applicationName}</div>
-                    <div className="text-xs text-muted-foreground">{app.host}</div>
+                    <div className="font-medium text-sm">
+                      {app.applicationName}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {app.host}
+                    </div>
                     <div className="text-xs mt-1">
                       <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700">
                         {app.status}
@@ -116,14 +124,19 @@ function ApplicationsPage() {
               <div className="rounded-lg border p-6 bg-primary/5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-lg font-semibold">{selectedApp.applicationName}</h3>
+                    <h3 className="text-lg font-semibold">
+                      {selectedApp.applicationName}
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                      {selectedApp.username}@{selectedApp.host}:{selectedApp.port}
+                      {selectedApp.username}@{selectedApp.host}:
+                      {selectedApp.port}
                     </p>
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-muted-foreground">Status</div>
-                    <div className="font-semibold capitalize">{selectedApp.status}</div>
+                    <div className="font-semibold capitalize">
+                      {selectedApp.status}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -153,7 +166,9 @@ function ApplicationsPage() {
                   {selectedApp.pathname && (
                     <div className="col-span-2">
                       <div className="text-muted-foreground">Path</div>
-                      <div className="font-medium text-xs">{selectedApp.pathname}</div>
+                      <div className="font-medium text-xs">
+                        {selectedApp.pathname}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -175,7 +190,10 @@ function ApplicationsPage() {
                 ) : (
                   <div className="space-y-2">
                     {appSteps.map((step, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm">
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 text-sm"
+                      >
                         {step.status === 'success' ? (
                           <span className="w-5 h-5 rounded-full bg-green-600 text-white flex items-center justify-center text-xs">
                             ✓
@@ -215,7 +233,9 @@ function ApplicationsPage() {
             </div>
           ) : (
             <div className="rounded-lg border p-6 text-center">
-              <p className="text-muted-foreground">Select an application to view details</p>
+              <p className="text-muted-foreground">
+                Select an application to view details
+              </p>
             </div>
           )}
         </div>

@@ -1,8 +1,8 @@
 import * as React from 'react'
-import { useForm } from '@tanstack/react-form'
+import type { useForm } from '@tanstack/react-form'
+import type { FormValues } from '@/lib/types/onboarding'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import type { FormValues } from '@/lib/types/onboarding'
 
 export type TextFieldProps = {
   form: ReturnType<typeof useForm<FormValues>>

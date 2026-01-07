@@ -1,11 +1,10 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { SessionConfig } from '../../lib/storage'
 import {
-  useVerifyConnection,
   useCheckGithubToken,
   useFetchReposFromBackend,
   useSelectRepo,
+  useVerifyConnection,
 } from '../../lib/queries/useOnboarding'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
@@ -19,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog'
+import type { SessionConfig } from '../../lib/storage'
 
 export const Route = createFileRoute('/onboarding/new')({
   component: NewApplication,

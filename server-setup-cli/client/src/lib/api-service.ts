@@ -1,4 +1,5 @@
-import axios, { AxiosInstance, AxiosError } from 'axios'
+import axios from 'axios'
+import type { AxiosError, AxiosInstance } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '/api'
 
@@ -8,7 +9,7 @@ interface ApiResponse<T = any> {
   error?: string | object
   data?: T
   sessionId?: string
-  steps?: any[]
+  steps?: Array<any>
   duration?: number
 }
 

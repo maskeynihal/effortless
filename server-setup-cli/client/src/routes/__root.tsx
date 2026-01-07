@@ -1,14 +1,13 @@
 import {
   HeadContent,
-  Scripts,
-  Outlet,
-  createRootRoute,
   Link,
+  Outlet,
+  Scripts,
+  createRootRoute,
 } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
-import { Button } from '../components/ui/button'
 
 import appCss from '../styles.css?url'
 

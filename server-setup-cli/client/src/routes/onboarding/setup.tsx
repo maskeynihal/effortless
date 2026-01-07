@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { createFileRoute, Outlet, Link } from '@tanstack/react-router'
+import { Link, Outlet, createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/onboarding/setup')({
   component: SetupLayout,

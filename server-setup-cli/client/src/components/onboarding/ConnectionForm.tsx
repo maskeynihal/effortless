@@ -1,4 +1,7 @@
 import * as React from 'react'
+import type { useForm } from '@tanstack/react-form'
+import type { FormValues } from '@/lib/types/onboarding'
+import type {Connections} from '@/lib/queries/useOnboarding';
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -9,11 +12,9 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { TextField } from '@/components/inputs/TextField'
-import { useForm } from '@tanstack/react-form'
-import type { FormValues } from '@/lib/types/onboarding'
 import {
-  useVerifyConnection,
-  type Connections,
+  
+  useVerifyConnection
 } from '@/lib/queries/useOnboarding'
 
 interface ConnectionFormProps {
@@ -72,7 +73,7 @@ export function ConnectionForm({ form, onVerified }: ConnectionFormProps) {
           type="button"
           disabled={verify.isPending}
           onClick={async () => {
-            const v = values as FormValues
+            const v = values
             if (
               !v.host ||
               !v.username ||
