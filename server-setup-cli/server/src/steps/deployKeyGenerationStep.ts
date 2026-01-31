@@ -29,7 +29,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
     repoStep: RepoSelectionStep,
     applicationName: string,
     host: string,
-    username: string
+    username: string,
   ) {
     this.sshStep = sshStep;
     this.githubStep = githubStep;
@@ -37,8 +37,9 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
     this.applicationName = applicationName;
     this.host = host;
     this.username = username;
-    this.deployKeyName = `${applicationName}_deploy_key`;
-    this.deployKeyTitle = `${applicationName} [${username}@${host}]`;
+    const timestamp = Date.now();
+    this.deployKeyName = `${applicationName}_deploy_key_${timestamp}`;
+    this.deployKeyTitle = `${applicationName} [${username}@${host}] - ${new Date(timestamp).toISOString()}`;
   }
 
   /**
@@ -73,11 +74,11 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
 
       // Step 2: Register deploy key with GitHub
       logger.info(
-        `[Deploy Key] Step 2/4: Registering deploy key with GitHub for ${selectedRepo}`
+        `[Deploy Key] Step 2/4: Registering deploy key with GitHub for ${selectedRepo}`,
       );
       const registerResult = await this.registerDeployKeyWithGitHub(
         selectedRepo,
-        publicKeyContent
+        publicKeyContent,
       );
       if (!registerResult.success) {
         return registerResult;
@@ -85,7 +86,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
 
       // Step 3: Update ~/.ssh/config on remote server
       logger.info(
-        `[Deploy Key] Step 3/5: Updating ~/.ssh/config on remote server`
+        `[Deploy Key] Step 3/5: Updating ~/.ssh/config on remote server`,
       );
       const configResult = await this.updateSSHConfigOnRemote(selectedRepo);
       if (!configResult.success) {
@@ -95,11 +96,11 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
       // Step 4: Test SSH connection to GitHub
       logger.info(`[Deploy Key] Step 4/5: Testing SSH connection to GitHub`);
       const testResult = await this.testGitHubConnection(
-        configResult.data?.hostAlias || `github.com-${this.applicationName}`
+        configResult.data?.hostAlias || `github.com-${this.applicationName}`,
       );
       if (!testResult.success) {
         logger.warn(
-          `[Deploy Key] SSH connection test warning: ${testResult.message}`
+          `[Deploy Key] SSH connection test warning: ${testResult.message}`,
         );
       }
 
@@ -137,12 +138,11 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
 
       // Step 1: Create .ssh directory if it doesn't exist
       logger.info(`[Deploy Key] Creating ~/.ssh directory`);
-      const mkdirResult = await this.sshStep.executeRemoteCommand(
-        "mkdir -p ~/.ssh"
-      );
+      const mkdirResult =
+        await this.sshStep.executeRemoteCommand("mkdir -p ~/.ssh");
       logger.debug(
         "[Deploy Key] mkdir output:",
-        mkdirResult.stdout || "(no output)"
+        mkdirResult.stdout || "(no output)",
       );
 
       // Step 2: Verify directory exists
@@ -150,7 +150,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
       const lsResult = await this.sshStep.executeRemoteCommand("ls -la ~/");
       logger.debug(
         "[Deploy Key] Directory listing:",
-        lsResult.stdout.substring(0, 200)
+        lsResult.stdout.substring(0, 200),
       );
 
       // Step 3: Generate ED25519 key
@@ -158,7 +158,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
       const sshKeygenCmd = `ssh-keygen -t ed25519 -f ${keyPath} -N "" -C "deploy-key-${this.applicationName}" < /dev/null`;
       const genResult = await this.sshStep.executeRemoteCommand(
         sshKeygenCmd,
-        60000
+        60000,
       ); // 60 second timeout for keygen
       logger.info("[Deploy Key] ssh-keygen output:", genResult.stdout);
 
@@ -170,13 +170,13 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
       logger.info(`[Deploy Key] Verifying key files`);
       const verifyResult = await this.sshStep.executeRemoteCommand(
         `ls -la ${keyPath}*`,
-        10000
+        10000,
       );
       logger.info("[Deploy Key] Key files:", verifyResult.stdout);
 
       if (!verifyResult.stdout.includes(this.deployKeyName)) {
         throw new Error(
-          `Deploy key file was not created: ${this.deployKeyName}`
+          `Deploy key file was not created: ${this.deployKeyName}`,
         );
       }
 
@@ -189,7 +189,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
       logger.info(`[Deploy Key] Retrieving public key content`);
       const pubKeyResult = await this.sshStep.executeRemoteCommand(
         `cat ${keyPath}.pub`,
-        10000
+        10000,
       );
       const publicKey = pubKeyResult.stdout.trim();
 
@@ -199,7 +199,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
 
       logger.info(
         "[Deploy Key] Public key retrieved successfully",
-        publicKey.substring(0, 50) + "..."
+        publicKey.substring(0, 50) + "...",
       );
 
       return {
@@ -225,7 +225,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
    */
   private async registerDeployKeyWithGitHub(
     repoFullName: string,
-    publicKeyContent: string
+    publicKeyContent: string,
   ): Promise<WorkflowStepResult> {
     try {
       const pat = this.githubStep.getPAT();
@@ -234,6 +234,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
       }
 
       logger.info(`[Deploy Key] Registering deploy key for ${repoFullName}`);
+      logger.debug(`[Deploy Key] Deploy key title: ${this.deployKeyTitle}`);
 
       const response = await axios.post(
         `${this.githubApiUrl}/repos/${repoFullName}/keys`,
@@ -247,11 +248,11 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
             Authorization: `token ${pat}`,
             Accept: "application/vnd.github.v3+json",
           },
-        }
+        },
       );
 
       logger.info(
-        `[Deploy Key] Deploy key registered successfully with ID: ${response.data.id}`
+        `[Deploy Key] Deploy key registered successfully with ID: ${response.data.id}`,
       );
 
       return {
@@ -262,11 +263,36 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
         },
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      logger.error(`[Deploy Key] Failed to register deploy key: ${message}`);
+      let message = "Unknown error";
+      let details = "";
+
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const statusText = error.response?.statusText;
+        details = error.response?.data?.message || error.message;
+        message = `GitHub API error: ${status} ${statusText}`;
+
+        if (status === 422) {
+          logger.error(
+            `[Deploy Key] 422 error - Key may already exist or invalid format`,
+          );
+        } else if (status === 401) {
+          logger.error(
+            `[Deploy Key] 401 error - Invalid or expired GitHub token`,
+          );
+        } else if (status === 403) {
+          logger.error(`[Deploy Key] 403 error - Insufficient permissions`);
+        }
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+
+      const fullError = `${message}${details ? ` - ${details}` : ""}`;
+      logger.error(`[Deploy Key] Failed to register deploy key: ${fullError}`);
+
       return {
         success: false,
-        message: `Failed to register deploy key: ${message}`,
+        message: `Failed to register deploy key: ${fullError}`,
       };
     }
   }
@@ -275,7 +301,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
    * Update ~/.ssh/config on remote server with unique GitHub entry
    */
   private async updateSSHConfigOnRemote(
-    repoFullName: string
+    repoFullName: string,
   ): Promise<WorkflowStepResult> {
     try {
       const keyPath = `~/.ssh/${this.deployKeyName}`;
@@ -288,7 +314,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
 
       // Check if config file exists
       const checkConfigResult = await this.sshStep.executeRemoteCommand(
-        "test -f ~/.ssh/config && echo 'exists' || echo 'not exists'"
+        "test -f ~/.ssh/config && echo 'exists' || echo 'not exists'",
       );
       const configExists = checkConfigResult.stdout.trim() === "exists";
 
@@ -297,7 +323,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
         logger.info("[Deploy Key] Removing old config entry if exists");
         const removeOldEntry = `sed -i.bak '/# Deploy key for ${repoFullName.replace(
           "/",
-          "\\/"
+          "\\/",
         )}/,/IdentitiesOnly yes/d' ~/.ssh/config`;
         await this.sshStep.executeRemoteCommand(removeOldEntry);
       }
@@ -313,7 +339,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
 
       // Verify the entry was added
       const verifyResult = await this.sshStep.executeRemoteCommand(
-        `grep -A 4 "${hostAlias}" ~/.ssh/config`
+        `grep -A 4 "${hostAlias}" ~/.ssh/config`,
       );
       logger.info("[Deploy Key] SSH config entry:", verifyResult.stdout);
 
@@ -328,7 +354,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       logger.error(
-        `[Deploy Key] Failed to update SSH config on remote: ${message}`
+        `[Deploy Key] Failed to update SSH config on remote: ${message}`,
       );
       return {
         success: false,
@@ -341,7 +367,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
    * Test SSH connection to GitHub using the deploy key
    */
   private async testGitHubConnection(
-    hostAlias: string
+    hostAlias: string,
   ): Promise<WorkflowStepResult> {
     try {
       logger.info(`[Deploy Key] Testing SSH connection to ${hostAlias}`);
@@ -370,7 +396,7 @@ export class DeployKeyGenerationStep implements IWorkflowStep {
         };
       } else if (output.includes("Permission denied")) {
         logger.error(
-          "[Deploy Key] GitHub SSH authentication failed - permission denied"
+          "[Deploy Key] GitHub SSH authentication failed - permission denied",
         );
         return {
           success: false,

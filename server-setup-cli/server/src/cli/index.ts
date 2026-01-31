@@ -44,7 +44,7 @@ class EffortlessCLI {
       await this.verifyConnections();
       await this.runMenu();
       console.log(
-        "\n✅ Done. You can rerun this CLI anytime to execute steps again.\n"
+        "\n✅ Done. You can rerun this CLI anytime to execute steps again.\n",
       );
     } catch (error: any) {
       console.error(`\n❌ Error: ${error.message || error}\n`);
@@ -134,7 +134,7 @@ class EffortlessCLI {
           default: String(this.prePort ?? 22),
           validate: (v: string) =>
             !v || isNaN(Number(v)) ? "Port must be a number" : true,
-        }
+        },
       );
     } else if (this.prePort == null) {
       // If using existing but port wasn't known, ask for it
@@ -157,7 +157,7 @@ class EffortlessCLI {
       ? (this.preUsername as string)
       : answers.username;
     const port = useExisting
-      ? this.prePort ?? (parseInt(answers.port, 10) || 22)
+      ? (this.prePort ?? (parseInt(answers.port, 10) || 22))
       : parseInt(answers.port, 10) || 22;
 
     // Determine applicationName: use preselected if available; else prompt to create new
@@ -182,12 +182,12 @@ class EffortlessCLI {
     // If preselected application (or existing record), load stored details for defaults
     const existingApps = await getApplicationsByHostUser(host, username);
     selectedApp = existingApps.find(
-      (app) => app.applicationName === applicationName
+      (app) => app.applicationName === applicationName,
     );
     const session = await getSessionByApplication(
       host,
       username,
-      applicationName
+      applicationName,
     );
     if (session) {
       selectedRepo = session.selectedRepo || undefined;
@@ -231,7 +231,7 @@ class EffortlessCLI {
       ]);
       const expandedKeyPath = keyAns.privateKeyPath.replace(
         "~",
-        process.env.HOME || ""
+        process.env.HOME || "",
       );
       if (!fs.existsSync(expandedKeyPath)) {
         throw new Error(`Private key not found at ${expandedKeyPath}`);
@@ -307,20 +307,20 @@ class EffortlessCLI {
 
       if (!response.data.success) {
         throw new Error(
-          response.data.error || "Connection verification failed"
+          response.data.error || "Connection verification failed",
         );
       }
 
       this.sessionId = response.data.sessionId;
       console.log(
-        `✓ SSH verified to ${this.config.username}@${this.config.host}`
+        `✓ SSH verified to ${this.config.username}@${this.config.host}`,
       );
       if (response.data.connections?.github) {
         const gh = response.data.connections.github;
         console.log(
           gh.connected
             ? `✓ GitHub verified as ${gh.username}`
-            : `⚠️ GitHub verification failed: ${gh.error || "unknown"}`
+            : `⚠️ GitHub verification failed: ${gh.error || "unknown"}`,
         );
       }
       console.log("");
@@ -533,7 +533,7 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(
-        `❌ Database creation failed: ${this.describeAxiosError(error)}`
+        `❌ Database creation failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -572,7 +572,7 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(
-        `❌ Folder setup failed: ${this.describeAxiosError(error)}`
+        `❌ Folder setup failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -780,17 +780,17 @@ class EffortlessCLI {
         console.log(`\nSecret Name: ${response.data.data?.secretName}`);
         console.log(`\nAdd this to your GitHub Actions workflow:`);
         console.log(
-          `  ssh-key: \${{ secrets.${response.data.data?.secretName} }}`
+          `  ssh-key: \${{ secrets.${response.data.data?.secretName} }}`,
         );
         console.log(
-          `\nPublic key has been added to authorized_keys on the server.`
+          `\nPublic key has been added to authorized_keys on the server.`,
         );
       } else {
         console.error(`❌ SSH key setup failed: ${response.data.error}`);
       }
     } catch (error: any) {
       console.error(
-        `❌ SSH key setup failed: ${this.describeAxiosError(error)}`
+        `❌ SSH key setup failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -827,7 +827,7 @@ class EffortlessCLI {
     ]);
 
     console.log(
-      "\n⏳ Installing server stack (this may take 5-10 minutes)...\n"
+      "\n⏳ Installing server stack (this may take 5-10 minutes)...\n",
     );
     console.log(`📦 PHP ${answers.phpVersion}`);
     console.log(`📦 ${answers.database === "mysql" ? "MySQL" : "PostgreSQL"}`);
@@ -857,7 +857,7 @@ class EffortlessCLI {
         console.log(
           `\n📦 Extensions installed: ${
             response.data.data?.extensionsInstalled || 0
-          }`
+          }`,
         );
         if (response.data.data?.installLog) {
           console.log("\n📝 Installation log:");
@@ -870,7 +870,7 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(
-        `❌ Server stack setup failed: ${this.describeAxiosError(error)}`
+        `❌ Server stack setup failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -920,7 +920,7 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(
-        `❌ HTTPS + Nginx setup failed: ${this.describeAxiosError(error)}`
+        `❌ HTTPS + Nginx setup failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -961,7 +961,7 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(
-        `❌ Node.js/NVM setup failed: ${this.describeAxiosError(error)}`
+        `❌ Node.js/NVM setup failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -991,7 +991,7 @@ class EffortlessCLI {
     this.config.domain = domain;
 
     console.log(
-      "\n⏳ Installing Nginx with minimal config and issuing HTTPS certificate...\n"
+      "\n⏳ Installing Nginx with minimal config and issuing HTTPS certificate...\n",
     );
     try {
       const response = await axios.post(`${API_URL}/step/certbot-nginx-setup`, {
@@ -1010,7 +1010,7 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(
-        `❌ Certbot Nginx setup failed: ${this.describeAxiosError(error)}`
+        `❌ Certbot Nginx setup failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -1057,7 +1057,7 @@ class EffortlessCLI {
       }
     } catch (error: any) {
       console.error(
-        `❌ Certbot issuance failed: ${this.describeAxiosError(error)}`
+        `❌ Certbot issuance failed: ${this.describeAxiosError(error)}`,
       );
     }
     console.log("");
@@ -1068,12 +1068,12 @@ class EffortlessCLI {
 
     try {
       const response = await axios.get(
-        `${API_URL}/steps/${this.config.host}/${this.config.username}/${this.config.applicationName}`
+        `${API_URL}/steps/${this.config.host}/${this.config.username}/${this.config.applicationName}`,
       );
 
       if (!response.data.success) {
         console.error(
-          `Failed to fetch logs: ${response.data.error || "unknown"}`
+          `Failed to fetch logs: ${response.data.error || "unknown"}`,
         );
         return;
       }
@@ -1130,7 +1130,7 @@ class EffortlessCLI {
 
     // Parse repo to owner/repo
     const repoMatch = repo?.match(
-      /(?:https:\/\/github\.com\/)?([^\/]+)\/(.+?)(?:\.git)?$/
+      /(?:https:\/\/github\.com\/)?([^\/]+)\/(.+?)(?:\.git)?$/,
     );
     if (!repoMatch) {
       console.error("❌ Invalid repository format");
@@ -1159,7 +1159,7 @@ class EffortlessCLI {
       const appRow = await getSessionByApplication(
         this.config.host,
         this.config.username,
-        this.config.applicationName
+        this.config.applicationName,
       );
       console.log(this.config, appRow);
       const secretName: string | undefined =
@@ -1171,7 +1171,7 @@ class EffortlessCLI {
       console.log(`🔑 Using secret name: ${secretName}`);
       if (!secretName) {
         console.error(
-          "❌ Secret name not found in database. Please run 'Setup SSH key for GitHub Actions' first."
+          "❌ Secret name not found in database. Please run 'Setup SSH key for GitHub Actions' first.",
         );
         return;
       }
@@ -1185,7 +1185,7 @@ class EffortlessCLI {
       try {
         const branchRes = await axios.get(
           `https://api.github.com/repos/${owner}/${repoName}/branches/${answers.baseBranch}`,
-          { headers }
+          { headers },
         );
         baseSha = branchRes.data.commit.sha;
         console.log(`✓ Base branch SHA: ${baseSha}`);
@@ -1197,12 +1197,12 @@ class EffortlessCLI {
           // Get default branch
           const repoRes = await axios.get(
             `https://api.github.com/repos/${owner}/${repoName}`,
-            { headers }
+            { headers },
           );
           const defaultBranch = repoRes.data.default_branch;
           const defaultBranchRes = await axios.get(
             `https://api.github.com/repos/${owner}/${repoName}/branches/${defaultBranch}`,
-            { headers }
+            { headers },
           );
           baseSha = defaultBranchRes.data.commit.sha;
 
@@ -1213,10 +1213,10 @@ class EffortlessCLI {
               ref: `refs/heads/${answers.baseBranch}`,
               sha: baseSha,
             },
-            { headers }
+            { headers },
           );
           console.log(
-            `✓ Base branch '${answers.baseBranch}' created from '${defaultBranch}'`
+            `✓ Base branch '${answers.baseBranch}' created from '${defaultBranch}'`,
           );
         } else {
           throw err;
@@ -1235,13 +1235,13 @@ class EffortlessCLI {
             ref: `refs/heads/${featureBranch}`,
             sha: baseSha,
           },
-          { headers }
+          { headers },
         );
         console.log(`✓ Feature branch created`);
       } catch (err: any) {
         if (err.response?.status === 422) {
           console.log(
-            `⚠️  Feature branch already exists, using existing branch`
+            `⚠️  Feature branch already exists, using existing branch`,
           );
         } else {
           throw err;
@@ -1256,7 +1256,7 @@ class EffortlessCLI {
       try {
         deployYamlRes = await axios.get(
           `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yml?ref=${featureBranch}`,
-          { headers }
+          { headers },
         );
         deployYamlSha = deployYamlRes.data.sha;
       } catch (err: any) {
@@ -1265,13 +1265,13 @@ class EffortlessCLI {
           try {
             deployYamlRes = await axios.get(
               `https://api.github.com/repos/${owner}/${repoName}/contents/deploy.yaml?ref=${featureBranch}`,
-              { headers }
+              { headers },
             );
             deployYamlSha = deployYamlRes.data.sha;
           } catch (yamlErr: any) {
             if (yamlErr.response?.status === 404) {
               console.log(
-                `⚠️  deploy.yml not found, skipping deploy.yml update`
+                `⚠️  deploy.yml not found, skipping deploy.yml update`,
               );
               deployYamlRes = null;
             } else {
@@ -1287,7 +1287,7 @@ class EffortlessCLI {
       if (deployYamlRes && deployYamlSha) {
         const currentContent = Buffer.from(
           deployYamlRes.data.content,
-          "base64"
+          "base64",
         ).toString("utf8");
         console.log(`✓ Deploy YAML found at: ${deployYamlPath}`);
 
@@ -1316,14 +1316,14 @@ class EffortlessCLI {
             branch: featureBranch,
             sha: deployYamlSha,
           },
-          { headers }
+          { headers },
         );
         console.log(`✓ deploy.yml committed`);
       }
 
       // 4. Create GitHub Actions workflow content
       console.log(`📍 Creating workflow for ${this.config.applicationName}...`);
-      const workflowPath = `.github/workflows/laravel-project-deployment.yml`;
+      const workflowPath = `.github/workflows/deploy-${this.config.applicationName}.yml`;
       const workflowContent = `name: Deploy ${this.config.applicationName}
 run-name: Deploy to production for \${{ github.ref }} by @\${{ github.actor }} (\${{ github.sha }})
 
@@ -1349,7 +1349,7 @@ jobs:
       try {
         const existingFile = await axios.get(
           `https://api.github.com/repos/${owner}/${repoName}/contents/${workflowPath}?ref=${featureBranch}`,
-          { headers }
+          { headers },
         );
         workflowFileSha = existingFile.data.sha;
         console.log(`✓ Existing workflow found, will update`);
@@ -1375,7 +1375,7 @@ jobs:
       const commitRes = await axios.put(
         `https://api.github.com/repos/${owner}/${repoName}/contents/${workflowPath}`,
         commitPayload,
-        { headers }
+        { headers },
       );
       const commitSha = commitRes.data.commit.sha;
       console.log(`✓ Commit SHA: ${commitSha}`);
@@ -1402,14 +1402,14 @@ jobs:
           head: featureBranch,
           base: answers.baseBranch,
         },
-        { headers }
+        { headers },
       );
       const prNumber = prRes.data.number;
       const prUrl = prRes.data.html_url;
       console.log(`✓ PR created: ${prUrl}`);
 
       console.log(
-        "\n✅ Deployment configuration updated and pull request opened"
+        "\n✅ Deployment configuration updated and pull request opened",
       );
       console.log(`\n📋 Details:`);
       console.log(`  Branch: ${featureBranch}`);
@@ -1450,7 +1450,7 @@ jobs:
         .filter((name): name is string => Boolean(name));
     } catch (error) {
       console.error(
-        `⚠️  Could not list GitHub repos: ${this.describeAxiosError(error)}`
+        `⚠️  Could not list GitHub repos: ${this.describeAxiosError(error)}`,
       );
       return [];
     }

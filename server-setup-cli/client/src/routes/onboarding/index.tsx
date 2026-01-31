@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
-import { useListApplications } from '../../lib/queries/useOnboarding'
-import { Button } from '../../components/ui/button'
-import ApplicationCard from './-components/ApplicationCard'
+import { useListApplications } from '@/lib/queries/useOnboarding'
+import { Button } from '@/components/ui/button'
+import ApplicationCard from '@/routes/onboarding/-components/ApplicationCard'
 
 export const Route = createFileRoute('/onboarding/')({
   component: Onboarding,

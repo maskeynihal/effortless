@@ -29,24 +29,24 @@ const DEFAULT_TEMPLATE_DIR = join(__dirname, "../../templates/nginxconfig.io");
 // Helper function to robustly resolve and load template files from common locations
 async function loadTemplate(
   templateName: string,
-  replacements: Record<string, string> = {}
+  replacements: Record<string, string> = {},
 ): Promise<string> {
   const candidates = [
     // Relative to compiled dist/src/server
     join(
       __dirname,
       "../../templates/nginxconfig.io",
-      `${templateName}.template`
+      `${templateName}.template`,
     ),
     join(
       __dirname,
       "../../../templates/nginxconfig.io",
-      `${templateName}.template`
+      `${templateName}.template`,
     ),
     join(
       __dirname,
       "../../../../templates/nginxconfig.io",
-      `${templateName}.template`
+      `${templateName}.template`,
     ),
     // Relative to project root (when cwd is server/)
     join(process.cwd(), "templates/nginxconfig.io", `${templateName}.template`),
@@ -54,7 +54,7 @@ async function loadTemplate(
     join(
       process.cwd(),
       "server/templates/nginxconfig.io",
-      `${templateName}.template`
+      `${templateName}.template`,
     ),
   ];
 
@@ -76,7 +76,7 @@ async function loadTemplate(
     throw new Error(
       `Failed to load template '${templateName}'. Last error: ${
         lastError?.message || lastError
-      }`
+      }`,
     );
   }
 
@@ -177,7 +177,7 @@ router.post("/connection/verify", async (req: Request, res: Response) => {
         githubConnected = true;
         githubUsername = response.data.login;
         logger.info(
-          `[Connection] GitHub connection successful as ${githubUsername}`
+          `[Connection] GitHub connection successful as ${githubUsername}`,
         );
       } catch (error: any) {
         githubError = error.message;
@@ -200,7 +200,7 @@ router.post("/connection/verify", async (req: Request, res: Response) => {
     const application = await getApplicationByName(
       host,
       username,
-      applicationName
+      applicationName,
     );
     const applicationId = application?.id;
 
@@ -220,7 +220,7 @@ router.post("/connection/verify", async (req: Request, res: Response) => {
             username: githubUsername,
           },
           duration: Date.now() - startTime,
-        })
+        }),
       );
     }
 
@@ -282,7 +282,7 @@ router.post("/applications", async (req: Request, res: Response) => {
     });
 
     logger.info(
-      `[Applications] Created application ${applicationName} for ${username}@${host}`
+      `[Applications] Created application ${applicationName} for ${username}@${host}`,
     );
 
     res.json({
@@ -299,7 +299,7 @@ router.post("/applications", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error(
-      `[Applications] Failed to create application: ${error.message}`
+      `[Applications] Failed to create application: ${error.message}`,
     );
     res.status(500).json({ success: false, error: error.message });
   }
@@ -351,7 +351,7 @@ router.post("/step/check-github-token", async (req: Request, res: Response) => {
       let app = await getApplicationByName(host, username, applicationName);
       if (!app) {
         logger.info(
-          `[GitHub] Application not found, creating new one for ${applicationName}`
+          `[GitHub] Application not found, creating new one for ${applicationName}`,
         );
         // Create a minimal application entry if it doesn't exist
         const sessionId = uuidv4();
@@ -392,7 +392,7 @@ router.post("/step/check-github-token", async (req: Request, res: Response) => {
             username: githubUsername,
             name: githubName,
             message: `GitHub token verified for ${githubUsername}`,
-          })
+          }),
         );
       }
 
@@ -415,7 +415,7 @@ router.post("/step/check-github-token", async (req: Request, res: Response) => {
           const app = await getApplicationByName(
             host,
             username,
-            applicationName
+            applicationName,
           );
           if (app?.id) {
             await addApplicationStep(
@@ -424,7 +424,7 @@ router.post("/step/check-github-token", async (req: Request, res: Response) => {
               "failed",
               JSON.stringify({
                 error: errorMessage,
-              })
+              }),
             );
           }
         } catch (e) {
@@ -489,7 +489,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
     }
 
     logger.info(
-      `[DeployKey] Generating deploy key for ${selectedRepo} (token present: ${!!app.githubToken})`
+      `[DeployKey] Generating deploy key for ${selectedRepo} (token present: ${!!app.githubToken})`,
     );
 
     // Build workflow-style steps to mirror routes.ts behavior
@@ -498,7 +498,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
       username,
       "",
       app.port || 22,
-      app.sshPrivateKey
+      app.sshPrivateKey,
     );
 
     const githubStep = new GitHubAuthStep(app.githubToken);
@@ -510,7 +510,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
       repoStep,
       applicationName,
       host,
-      username
+      username,
     );
 
     // Ensure SSH connects first
@@ -523,7 +523,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
         JSON.stringify({
           error: sshResult.message,
           duration: Date.now() - startTime,
-        })
+        }),
       );
 
       return res.status(500).json({
@@ -543,7 +543,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
         JSON.stringify({
           error: authResult.message,
           duration: Date.now() - startTime,
-        })
+        }),
       );
       return res.status(400).json({
         success: false,
@@ -564,7 +564,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
           repository: selectedRepo,
           deployKeyName: result.data?.deployKeyName,
           duration: result.data?.duration || Date.now() - startTime,
-        })
+        }),
       );
       return res.json({
         success: true,
@@ -580,7 +580,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
       JSON.stringify({
         error: result.message,
         duration: result.data?.duration || Date.now() - startTime,
-      })
+      }),
     );
 
     return res.status(500).json({ success: false, error: result.message });
@@ -595,7 +595,7 @@ router.post("/step/deploy-key", async (req: Request, res: Response) => {
         JSON.stringify({
           error: error.message,
           duration: Date.now() - startTime,
-        })
+        }),
       );
     }
 
@@ -709,7 +709,7 @@ router.post("/step/database-create", async (req: Request, res: Response) => {
         stdout,
         stderr,
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     res.json({
@@ -730,7 +730,7 @@ router.post("/step/database-create", async (req: Request, res: Response) => {
       const app = await getApplicationByName(
         req.body.host,
         req.body.username,
-        req.body.applicationName
+        req.body.applicationName,
       );
       if (app) {
         await addApplicationStep(
@@ -740,7 +740,7 @@ router.post("/step/database-create", async (req: Request, res: Response) => {
           JSON.stringify({
             error: error.message,
             duration: Date.now() - startTime,
-          })
+          }),
         );
       }
     } catch (e) {}
@@ -801,7 +801,7 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
     const execWithTimeout = (
       cmd: string,
       label: string,
-      timeoutMs: number = 15000
+      timeoutMs: number = 15000,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -873,7 +873,7 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
     await execWithTimeout(
       `sudo -n chown -R ${username}:${username} ${pathname}`,
       "chown",
-      10000
+      10000,
     );
 
     // Set permissions to ensure write access
@@ -888,7 +888,7 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
     const db =
       require("../shared/database").getDb?.() ||
       require("knex")(
-        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"],
       );
     await db("applications").where({ id: app.id }).update({ pathname });
 
@@ -901,7 +901,7 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
         pathname,
         owner: `${username}:${username}`,
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     res.json({
@@ -919,7 +919,7 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
       const app = await getApplicationByName(
         req.body.host,
         req.body.username,
-        req.body.applicationName
+        req.body.applicationName,
       );
       if (app) {
         await addApplicationStep(
@@ -929,7 +929,7 @@ router.post("/step/folder-setup", async (req: Request, res: Response) => {
           JSON.stringify({
             error: error.message,
             duration: Date.now() - startTime,
-          })
+          }),
         );
       }
     } catch (e) {}
@@ -971,7 +971,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
     await ensureDatabaseInitialized();
 
     logger.info(
-      `[EnvSetup] Loading application record for ${username}@${host}:${applicationName}`
+      `[EnvSetup] Loading application record for ${username}@${host}:${applicationName}`,
     );
     const app = await getApplicationByName(host, username, applicationName);
     if (!app) {
@@ -1007,7 +1007,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       [owner, repoName] = repo.split("/");
     } else {
       const m = repo.match(
-        /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/
+        /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/,
       );
       if (!m) {
         return res.status(400).json({
@@ -1030,11 +1030,11 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       if (token) {
         baseHeaders["Authorization"] = `Bearer ${token}`;
         logger.info(
-          `[EnvSetup] GitHub token present; using authenticated requests`
+          `[EnvSetup] GitHub token present; using authenticated requests`,
         );
       } else {
         logger.info(
-          `[EnvSetup] No GitHub token present; attempting public raw fetch as fallback`
+          `[EnvSetup] No GitHub token present; attempting public raw fetch as fallback`,
         );
       }
 
@@ -1050,7 +1050,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       for (const ref of branches) {
         for (const p of candidatePaths) {
           const apiUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURI(
-            p
+            p,
           )}`;
           try {
             logger.info(`[EnvSetup] Contents API try: ref=${ref} path=${p}`);
@@ -1060,7 +1060,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
             });
             if (r.status === 200 && typeof r.data === "string") {
               logger.info(
-                `[EnvSetup] Found .env.example via Contents API at ${p} (ref ${ref})`
+                `[EnvSetup] Found .env.example via Contents API at ${p} (ref ${ref})`,
               );
               return r.data as string;
             }
@@ -1068,7 +1068,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
             const status = e?.response?.status;
             if (status && status !== 404) {
               logger.debug(
-                `[EnvSetup] Contents API error ${status} for ${apiUrl}`
+                `[EnvSetup] Contents API error ${status} for ${apiUrl}`,
               );
             }
           }
@@ -1101,13 +1101,13 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       });
     }
     logger.info(
-      `[EnvSetup] .env.example fetched successfully (${envContent.length} bytes)`
+      `[EnvSetup] .env.example fetched successfully (${envContent.length} bytes)`,
     );
 
     // Connect to server and write file to <pathname>/shared/.env
     const ssh = new SSH2Client();
     logger.info(
-      `[EnvSetup] Establishing SSH connection to ${username}@${host}`
+      `[EnvSetup] Establishing SSH connection to ${username}@${host}`,
     );
     await new Promise<void>((resolve, reject) => {
       ssh.on("ready", resolve);
@@ -1130,7 +1130,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       cmd: string,
       label: string,
       timeoutMs: number = 15000,
-      allowNonZero: boolean = true
+      allowNonZero: boolean = true,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -1180,7 +1180,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
 
     // Ensure shared directory exists (quietly) using sudo -n; fail fast if sudo prompts
     logger.info(
-      `[EnvSetup] Ensuring shared directory exists at ${sharedDir} using ACL`
+      `[EnvSetup] Ensuring shared directory exists at ${sharedDir} using ACL`,
     );
 
     // Pre-check sudo -n to avoid hangs
@@ -1195,7 +1195,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
         `sudo -n true`,
         "sudo check",
         5000,
-        false
+        false,
       );
       sudoCheck = {
         ok: result.code === 0,
@@ -1237,7 +1237,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       `mkdir -p ${sharedDir}`,
       "mkdir sharedDir",
       10000,
-      false
+      false,
     );
 
     logger.info(`[EnvSetup] Writing .env to ${envPath} as SSH user`);
@@ -1247,7 +1247,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       `cat <<'${heredoc}' > ${envPath}\n${envContent}\n${heredoc}`,
       "write .env",
       15000,
-      false
+      false,
     );
     logger.info(`[EnvSetup] .env write completed`);
 
@@ -1258,7 +1258,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
       `test -f ${envPath} && echo exists || echo missing`,
       "verify .env",
       8000,
-      true
+      true,
     ).then((res) => {
       verifyOutput = res.stdout || "";
     });
@@ -1275,7 +1275,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
         path: envPath,
         verification: verifyOutput.trim(),
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     logger.info(`[EnvSetup] Env setup completed successfully`);
@@ -1314,7 +1314,7 @@ router.post("/step/env-setup", async (req: Request, res: Response) => {
           app.id,
           "env-setup",
           "failed",
-          JSON.stringify({ error: details, duration: Date.now() - startTime })
+          JSON.stringify({ error: details, duration: Date.now() - startTime }),
         );
       }
     } catch (_) {}
@@ -1414,7 +1414,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
       cmd: string,
       label: string,
       timeoutMs: number = 15000,
-      allowNonZero: boolean = true
+      allowNonZero: boolean = true,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -1468,7 +1468,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
       `cat ${envPath}`,
       "read .env",
       10000,
-      false
+      false,
     );
     let envContent = readResult.stdout;
 
@@ -1498,7 +1498,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
       const [key] = trimmed.split("=");
       if (key && updates.hasOwnProperty(key.trim())) {
         logger.debug(
-          `[EnvUpdate] Updating ${key.trim()} = ${updates[key.trim()]}`
+          `[EnvUpdate] Updating ${key.trim()} = ${updates[key.trim()]}`,
         );
         return `${key.trim()}=${updates[key.trim()]}`;
       }
@@ -1510,7 +1510,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
     const existingKeys = new Set(
       lines
         .map((line) => line.split("=")[0].trim())
-        .filter((key) => key && !key.startsWith("#"))
+        .filter((key) => key && !key.startsWith("#")),
     );
 
     for (const [key, value] of Object.entries(updates)) {
@@ -1529,7 +1529,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
       `cat <<'${heredoc}' > ${envPath}\n${newEnvContent}\n${heredoc}`,
       "write .env",
       15000,
-      false
+      false,
     );
     logger.info(`[EnvUpdate] .env update completed`);
 
@@ -1539,7 +1539,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
       `grep -E "^DB_" ${envPath}`,
       "verify .env",
       10000,
-      true
+      true,
     );
     const dbLines = verifyResult.stdout;
 
@@ -1558,7 +1558,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
         dbUsername,
         verification: dbLines.trim(),
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     logger.info(`[EnvUpdate] Env update completed successfully`);
@@ -1584,7 +1584,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
       const app = await getApplicationByName(
         req.body.host,
         req.body.username,
-        req.body.applicationName
+        req.body.applicationName,
       );
       if (app) {
         await addApplicationStep(
@@ -1594,7 +1594,7 @@ router.post("/step/env-update", async (req: Request, res: Response) => {
           JSON.stringify({
             error: error.message,
             duration: Date.now() - startTime,
-          })
+          }),
         );
       }
     } catch (e) {}
@@ -1675,7 +1675,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       cmd: string,
       label: string,
       timeoutMs: number = 15000,
-      allowNonZero: boolean = true
+      allowNonZero: boolean = true,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -1685,7 +1685,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
           if (finished) return;
           finished = true;
           logger.error(
-            `[SSHKeySetup] Timeout (${timeoutMs}ms) running ${label}`
+            `[SSHKeySetup] Timeout (${timeoutMs}ms) running ${label}`,
           );
           reject(new Error(`Timeout running ${label}`));
         }, timeoutMs);
@@ -1734,7 +1734,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       `ssh-keygen -t ed25519 -f ${keyPath} -N "" -C "github-actions-${applicationName}" 2>&1 || true`,
       "generate key",
       15000,
-      true
+      true,
     );
 
     // Read private key
@@ -1743,7 +1743,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       `cat ${keyPath}`,
       "read private key",
       10000,
-      false
+      false,
     );
     const privateKey = privateKeyResult.stdout;
 
@@ -1762,7 +1762,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       `cat ${keyPath}.pub`,
       "read public key",
       10000,
-      false
+      false,
     );
     const publicKey = publicKeyResult.stdout;
 
@@ -1781,7 +1781,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       `mkdir -p ~/.ssh && echo "${publicKey.trim()}" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`,
       "add to authorized_keys",
       10000,
-      false
+      false,
     );
 
     // Parse repo owner/name
@@ -1792,7 +1792,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       [owner, repoName] = selectedRepo.split("/");
     } else {
       const m = selectedRepo.match(
-        /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/
+        /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/,
       );
       if (!m) {
         ssh.end();
@@ -1817,19 +1817,19 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
         host,
         username,
         applicationName,
-        secretName
+        secretName,
       );
     } catch (dbErr: any) {
       logger.warn(
         `[SSHKeySetup] Failed to persist secret name: ${
           dbErr?.message || dbErr
-        }`
+        }`,
       );
     }
 
     // Add private key to GitHub secret with proper encryption
     logger.info(
-      `[SSHKeySetup] Adding private key to GitHub secret: ${secretName}`
+      `[SSHKeySetup] Adding private key to GitHub secret: ${secretName}`,
     );
     try {
       // Step 1: Get the repository's public key for encryption
@@ -1843,17 +1843,17 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
             "X-GitHub-Api-Version": "2022-11-28",
           },
           timeout: 10000,
-        }
+        },
       );
 
       const publicKeyData = publicKeyResponse.data;
       logger.info(
-        `[SSHKeySetup] Got public key with ID: ${publicKeyData.key_id}`
+        `[SSHKeySetup] Got public key with ID: ${publicKeyData.key_id}`,
       );
 
       // Step 2: Encrypt the private key using LibSodium per GitHub docs
       logger.info(
-        `[SSHKeySetup] Encrypting secret with libsodium crypto_box_seal`
+        `[SSHKeySetup] Encrypting secret with libsodium crypto_box_seal`,
       );
 
       // Initialize libsodium (async)
@@ -1885,11 +1885,11 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
             "X-GitHub-Api-Version": "2022-11-28",
           },
           timeout: 15000,
-        }
+        },
       );
 
       logger.info(
-        `[SSHKeySetup] GitHub secret created/updated: ${secretName} (status: ${secretResponse.status})`
+        `[SSHKeySetup] GitHub secret created/updated: ${secretName} (status: ${secretResponse.status})`,
       );
     } catch (e: any) {
       const errorDetails = (() => {
@@ -1906,7 +1906,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       })();
       logger.error(
         `[SSHKeySetup] Failed to create GitHub secret`,
-        errorDetails
+        errorDetails,
       );
       // Log but continue - key is already on server, user can add secret manually if needed
     }
@@ -1924,7 +1924,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
         publicKeyAdded: true,
         repository: `${owner}/${repoName}`,
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     logger.info(`[SSHKeySetup] SSH key setup completed successfully`);
@@ -1946,7 +1946,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
       const app = await getApplicationByName(
         req.body.host,
         req.body.username,
-        req.body.applicationName
+        req.body.applicationName,
       );
       if (app) {
         await addApplicationStep(
@@ -1956,7 +1956,7 @@ router.post("/step/ssh-key-setup", async (req: Request, res: Response) => {
           JSON.stringify({
             error: error.message,
             duration: Date.now() - startTime,
-          })
+          }),
         );
       }
     } catch (e) {}
@@ -2036,7 +2036,7 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
       cmd: string,
       label: string,
       timeoutMs: number = 300000, // 5 min default for package installs
-      allowNonZero: boolean = false
+      allowNonZero: boolean = false,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -2046,7 +2046,7 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
           if (finished) return;
           finished = true;
           logger.error(
-            `[ServerStack] Timeout (${timeoutMs}ms) running ${label}`
+            `[ServerStack] Timeout (${timeoutMs}ms) running ${label}`,
           );
           reject(new Error(`Timeout running ${label}`));
         }, timeoutMs);
@@ -2107,7 +2107,7 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         "(. /etc/os-release; echo $ID) 2>/dev/null || echo unknown",
         "detect os",
         8000,
-        true
+        true,
       );
       osId = (r.stdout || "").trim().toLowerCase();
       if (["ubuntu", "debian"].includes(osId)) pkgMgr = "apt";
@@ -2135,19 +2135,19 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         "DEBIAN_FRONTEND=noninteractive sudo -n apt-get update -yq && DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq software-properties-common",
         "install add-apt-repository",
         180000,
-        false
+        false,
       );
       await execWithTimeout(
         "DEBIAN_FRONTEND=noninteractive sudo -n add-apt-repository ppa:ondrej/php -y",
         "add php ppa",
         120000,
-        false
+        false,
       );
       await execWithTimeout(
         "DEBIAN_FRONTEND=noninteractive sudo -n apt-get update -yq",
         "apt update",
         180000,
-        false
+        false,
       );
       installLog.push("Added ondrej/php PPA");
     } else {
@@ -2156,25 +2156,25 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         `sudo -n ${pkgMgr} install -y epel-release`,
         "install epel",
         180000,
-        true
+        true,
       );
       await execWithTimeout(
         `sudo -n ${pkgMgr} install -y https://rpms.remirepo.net/enterprise/remi-release-\$(rpm -E %rhel).rpm || true`,
         "install remi",
         180000,
-        true
+        true,
       );
       await execWithTimeout(
         `sudo -n ${pkgMgr} module reset php -y || true`,
         "reset php module",
         60000,
-        true
+        true,
       );
       await execWithTimeout(
         `sudo -n ${pkgMgr} module enable php:remi-${phpVersion} -y || true`,
         "enable php module",
         60000,
-        true
+        true,
       );
       installLog.push(`Enabled Remi PHP ${phpVersion} module`);
     }
@@ -2186,14 +2186,14 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq nginx acl",
         "install nginx and acl",
         240000,
-        false
+        false,
       );
     } else {
       await execWithTimeout(
         `sudo -n ${pkgMgr} install -y -q nginx acl`,
         "install nginx and acl",
         240000,
-        false
+        false,
       );
     }
     installLog.push("Installed Nginx");
@@ -2206,14 +2206,14 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
           "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq mysql-server",
           "install mysql",
           300000,
-          false
+          false,
         );
       } else {
         await execWithTimeout(
           `sudo -n ${pkgMgr} install -y -q mysql-server`,
           "install mysql",
           300000,
-          false
+          false,
         );
       }
       // Start and enable MySQL
@@ -2221,7 +2221,7 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         "sudo -n systemctl enable --now mysql || sudo -n systemctl enable --now mysqld",
         "start mysql",
         30000,
-        true
+        true,
       );
       installLog.push("Installed MySQL server");
     } else if (database === "pgsql") {
@@ -2230,21 +2230,21 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
           "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq postgresql postgresql-contrib",
           "install postgresql",
           300000,
-          false
+          false,
         );
       } else {
         await execWithTimeout(
           `sudo -n ${pkgMgr} install -y -q postgresql-server postgresql-contrib`,
           "install postgresql",
           300000,
-          false
+          false,
         );
         // Initialize PostgreSQL for RHEL-based systems
         await execWithTimeout(
           "sudo -n postgresql-setup --initdb || true",
           "init postgresql",
           60000,
-          true
+          true,
         );
       }
       // Start and enable PostgreSQL
@@ -2252,14 +2252,14 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         "sudo -n systemctl enable --now postgresql",
         "start postgresql",
         30000,
-        true
+        true,
       );
       installLog.push("Installed PostgreSQL server");
     }
 
     // Step 4: Install PHP and extensions
     logger.info(
-      `[ServerStack] Installing PHP ${phpVersion} and Laravel extensions`
+      `[ServerStack] Installing PHP ${phpVersion} and Laravel extensions`,
     );
 
     // Core Laravel extensions
@@ -2298,7 +2298,7 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         `DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq ${phpPackages}`,
         "install php extensions",
         360000,
-        false
+        false,
       );
     } else {
       // For RHEL/Rocky, package names are different
@@ -2316,11 +2316,11 @@ router.post("/step/server-stack-setup", async (req: Request, res: Response) => {
         `sudo -n ${pkgMgr} install -y -q ${rhelPhpPackages}`,
         "install php extensions",
         360000,
-        false
+        false,
       );
     }
     installLog.push(
-      `Installed PHP ${phpVersion} with ${phpExtensions.length} extensions`
+      `Installed PHP ${phpVersion} with ${phpExtensions.length} extensions`,
     );
 
     // Step 5: Install Composer
@@ -2338,7 +2338,7 @@ sudo -n chmod +x /usr/local/bin/composer
       `sudo -n systemctl enable --now php${phpVersion}-fpm || sudo -n systemctl enable --now php-fpm`,
       "start php-fpm",
       30000,
-      true
+      true,
     );
     installLog.push("Configured and started PHP-FPM");
 
@@ -2347,7 +2347,7 @@ sudo -n chmod +x /usr/local/bin/composer
       "sudo -n systemctl enable --now nginx",
       "start nginx",
       20000,
-      true
+      true,
     );
     installLog.push("Started Nginx");
 
@@ -2362,7 +2362,7 @@ sudo -n chmod +x /usr/local/bin/composer
         "php -v | head -1",
         "php version",
         5000,
-        true
+        true,
       );
       phpVersionOutput = phpVer.stdout.trim();
     } catch (_) {}
@@ -2372,7 +2372,7 @@ sudo -n chmod +x /usr/local/bin/composer
         "composer --version",
         "composer version",
         5000,
-        true
+        true,
       );
       composerVersionOutput = compVer.stdout.trim();
     } catch (_) {}
@@ -2382,7 +2382,7 @@ sudo -n chmod +x /usr/local/bin/composer
         "nginx -v 2>&1",
         "nginx version",
         5000,
-        true
+        true,
       );
       nginxVersionOutput = nginxVer.stderr.trim() || nginxVer.stdout.trim();
     } catch (_) {}
@@ -2393,7 +2393,7 @@ sudo -n chmod +x /usr/local/bin/composer
           "mysql --version",
           "mysql version",
           5000,
-          true
+          true,
         );
         dbVersionOutput = dbVer.stdout.trim();
       } catch (_) {}
@@ -2403,7 +2403,7 @@ sudo -n chmod +x /usr/local/bin/composer
           "psql --version",
           "psql version",
           5000,
-          true
+          true,
         );
         dbVersionOutput = dbVer.stdout.trim();
       } catch (_) {}
@@ -2429,7 +2429,7 @@ sudo -n chmod +x /usr/local/bin/composer
           database: dbVersionOutput,
         },
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     logger.info("[ServerStack] Server stack setup completed successfully");
@@ -2466,7 +2466,7 @@ sudo -n chmod +x /usr/local/bin/composer
           JSON.stringify({
             error: error?.message || error,
             duration: Date.now() - startTime,
-          })
+          }),
         );
       }
     } catch (_) {}
@@ -2542,7 +2542,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       cmd: string,
       label: string,
       timeoutMs: number = 30000,
-      allowNonZero: boolean = false
+      allowNonZero: boolean = false,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -2570,8 +2570,8 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
                 new Error(
                   `${label} exited with ${code}${
                     stderr ? `: ${stderr.trim()}` : ""
-                  }`
-                )
+                  }`,
+                ),
               );
             }
             resolve({ code, stdout, stderr });
@@ -2608,7 +2608,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
         "(. /etc/os-release; echo $ID) 2>/dev/null || echo unknown",
         "detect os",
         8000,
-        true
+        true,
       );
       const id = (r.stdout || "").trim().toLowerCase();
       if (["ubuntu", "debian"].includes(id)) pkgMgr = "apt";
@@ -2625,16 +2625,16 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
     if (pkgMgr === "apt") {
       installCommands.push(
         "DEBIAN_FRONTEND=noninteractive sudo -n apt-get update -yq",
-        "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq nginx certbot python3-certbot-nginx"
+        "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq nginx certbot python3-certbot-nginx",
       );
     } else if (pkgMgr === "dnf") {
       installCommands.push(
-        "sudo -n dnf -y -q install nginx certbot python3-certbot-nginx || sudo -n yum -y -q install nginx certbot python3-certbot-nginx"
+        "sudo -n dnf -y -q install nginx certbot python3-certbot-nginx || sudo -n yum -y -q install nginx certbot python3-certbot-nginx",
       );
     } else if (pkgMgr === "apk") {
       installCommands.push(
         "sudo -n apk update -q",
-        "sudo -n apk add -q nginx certbot certbot-nginx"
+        "sudo -n apk add -q nginx certbot certbot-nginx",
       );
     }
 
@@ -2650,7 +2650,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n systemctl enable --now nginx || sudo -n service nginx start || true",
       "start nginx",
       20000,
-      true
+      true,
     );
     processLog.push("✅ Nginx service enabled and started");
 
@@ -2671,7 +2671,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `sudo -n mkdir -p /var/www/_letsencrypt`,
       "create directories",
       15000,
-      false
+      false,
     );
 
     // Load nginx.conf template
@@ -2680,7 +2680,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `cat <<'EOF_NGINX_CONF' | sudo -n tee /etc/nginx/nginx.conf > /dev/null\n${nginxConf}\nEOF_NGINX_CONF`,
       "write nginx.conf",
       15000,
-      false
+      false,
     );
     processLog.push("✅ Main nginx.conf written");
 
@@ -2689,7 +2689,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n mkdir -p /etc/nginx/nginxconfig.io",
       "create nginxconfig.io dir",
       10000,
-      false
+      false,
     );
 
     // Load and write security snippet
@@ -2698,7 +2698,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `cat <<'EOF_SEC' | sudo -n tee /etc/nginx/nginxconfig.io/security.conf > /dev/null\n${securityConf}\nEOF_SEC`,
       "write security snippet",
       15000,
-      false
+      false,
     );
     processLog.push("✅ Security configuration written");
 
@@ -2708,7 +2708,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `cat <<'EOF_GEN' | sudo -n tee /etc/nginx/nginxconfig.io/general.conf > /dev/null\n${generalConf}\nEOF_GEN`,
       "write general snippet",
       15000,
-      false
+      false,
     );
     processLog.push("✅ General configuration written");
 
@@ -2718,7 +2718,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `cat <<'EOF_PHP' | sudo -n tee /etc/nginx/nginxconfig.io/php_fastcgi.conf > /dev/null\n${phpFastcgiConf}\nEOF_PHP`,
       "write php fastcgi snippet",
       15000,
-      false
+      false,
     );
     processLog.push("✅ PHP FastCGI configuration written");
 
@@ -2728,7 +2728,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `cat <<'EOF_LW' | sudo -n tee /etc/nginx/nginxconfig.io/livewire.conf > /dev/null\n${livewireConf}\nEOF_LW`,
       "write livewire snippet",
       15000,
-      false
+      false,
     );
     processLog.push("✅ Livewire configuration written");
 
@@ -2738,7 +2738,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `cat <<'EOF_LE' | sudo -n tee /etc/nginx/nginxconfig.io/letsencrypt.conf > /dev/null\n${letsencryptConf}\nEOF_LE`,
       "write letsencrypt snippet",
       15000,
-      false
+      false,
     );
     processLog.push("✅ Let's Encrypt configuration written");
 
@@ -2755,7 +2755,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `cat <<'EOF_SERVER' | sudo -n tee ${serverConfPath} > /dev/null\n${serverConf}\nEOF_SERVER`,
       "write server block",
       15000,
-      false
+      false,
     );
     processLog.push(`✅ Server configuration written to ${serverConfPath}`);
 
@@ -2763,7 +2763,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       `sudo -n ln -sf ${serverConfPath} /etc/nginx/sites-enabled/${domain}.conf`,
       "enable site",
       10000,
-      true
+      true,
     );
     processLog.push("✅ Site enabled");
 
@@ -2772,7 +2772,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n rm -f /etc/nginx/sites-enabled/default",
       "remove default site",
       10000,
-      true
+      true,
     );
     processLog.push("✅ Default site removed");
 
@@ -2783,7 +2783,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n openssl dhparam -out /etc/nginx/dhparam.pem 2048",
       "generate dhparam",
       180000,
-      false
+      false,
     );
     processLog.push("✅ DH parameters generated");
 
@@ -2794,19 +2794,19 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n mkdir -p /var/www/_letsencrypt",
       "create letsencrypt dir",
       10000,
-      false
+      false,
     );
     await execWithTimeout(
       "sudo -n chown www-data /var/www/_letsencrypt",
       "set letsencrypt ownership",
       10000,
-      false
+      false,
     );
     processLog.push("✅ ACME challenge directory created and configured");
 
     // STEP 5: Comment out SSL directives temporarily
     logger.info(
-      "[HTTPS+Nginx] Commenting out SSL directives for initial setup"
+      "[HTTPS+Nginx] Commenting out SSL directives for initial setup",
     );
     processLog.push("⏳ Temporarily disabling SSL directives...");
     const commentSSLCmd = `sudo -n sed -i -r 's/(listen .*443)/\\1; #/g; s/(ssl_(certificate|certificate_key|trusted_certificate) )/#;#\\1/g; s/(server \\{)/\\1\\n    ssl off;/g' ${serverConfPath}`;
@@ -2814,7 +2814,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       commentSSLCmd,
       "comment ssl directives",
       15000,
-      false
+      false,
     );
     processLog.push("✅ SSL directives temporarily disabled");
 
@@ -2828,7 +2828,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n systemctl reload nginx || sudo -n service nginx reload",
       "nginx reload",
       20000,
-      false
+      false,
     );
     processLog.push("✅ Nginx reloaded");
 
@@ -2840,7 +2840,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       certbotCmd,
       "certbot obtain certificate",
       300000,
-      true
+      true,
     );
     // Verify certificate files exist before enabling SSL
     const certLivePath = `/etc/letsencrypt/live/${domain}`;
@@ -2902,7 +2902,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       uncommentSSLCmd,
       "uncomment ssl directives",
       15000,
-      false
+      false,
     );
     processLog.push("✅ SSL directives enabled");
 
@@ -2916,7 +2916,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n systemctl reload nginx || sudo -n service nginx reload",
       "final nginx reload",
       20000,
-      false
+      false,
     );
     processLog.push("✅ Nginx reloaded with SSL enabled");
 
@@ -2932,7 +2932,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
       "sudo -n systemctl enable --now certbot.timer || true",
       "enable certbot timer",
       15000,
-      true
+      true,
     );
     processLog.push("✅ Certbot auto-renewal timer enabled");
 
@@ -2951,7 +2951,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
         email,
         processLog,
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     return res.json({
@@ -2984,7 +2984,7 @@ router.post("/step/https-nginx-setup", async (req: Request, res: Response) => {
             error: error?.message || error,
             processLog,
             duration: Date.now() - startTime,
-          })
+          }),
         );
       }
     } catch (_) {}
@@ -3049,7 +3049,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
       cmd: string,
       label: string,
       timeoutMs: number = 60000,
-      allowNonZero: boolean = false
+      allowNonZero: boolean = false,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -3077,8 +3077,8 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
                 new Error(
                   `${label} exited with ${code}${
                     stderr ? `: ${stderr.trim()}` : ""
-                  }`
-                )
+                  }`,
+                ),
               );
             }
             resolve({ code, stdout, stderr });
@@ -3113,7 +3113,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
         "(. /etc/os-release; echo $ID) 2>/dev/null || echo unknown",
         "detect os",
         8000,
-        true
+        true,
       );
       const id = (r.stdout || "").trim().toLowerCase();
       if (["ubuntu", "debian"].includes(id)) pkgMgr = "apt";
@@ -3127,16 +3127,16 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
     if (pkgMgr === "apt") {
       installCmds.push(
         "DEBIAN_FRONTEND=noninteractive sudo -n apt-get update -yq",
-        "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq certbot python3-certbot-nginx"
+        "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq certbot python3-certbot-nginx",
       );
     } else if (pkgMgr === "dnf") {
       installCmds.push(
-        "sudo -n dnf -y -q install certbot python3-certbot-nginx || sudo -n yum -y -q install certbot python3-certbot-nginx"
+        "sudo -n dnf -y -q install certbot python3-certbot-nginx || sudo -n yum -y -q install certbot python3-certbot-nginx",
       );
     } else if (pkgMgr === "apk") {
       installCmds.push(
         "sudo -n apk update -q",
-        "sudo -n apk add -q certbot certbot-nginx"
+        "sudo -n apk add -q certbot certbot-nginx",
       );
     }
     for (const cmd of installCmds) {
@@ -3150,7 +3150,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
         "sudo -n nginx -v 2>&1",
         "nginx version",
         5000,
-        true
+        true,
       );
       nginxPresent = !!(v.stdout || v.stderr);
     } catch (_) {}
@@ -3167,7 +3167,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
     let certbotCmd = "";
     if (nginxPresent) {
       certbotCmd = ["sudo -n certbot --nginx", ...baseArgs, "--redirect"].join(
-        " "
+        " ",
       );
     } else {
       certbotCmd = [
@@ -3181,7 +3181,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
       certbotCmd,
       "certbot issue",
       300000,
-      true
+      true,
     );
 
     // Enable auto-renewal
@@ -3189,7 +3189,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
       "sudo -n systemctl enable --now certbot.timer || true",
       "enable renewal timer",
       15000,
-      true
+      true,
     );
 
     ssh.end();
@@ -3204,7 +3204,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
         method: nginxPresent ? "nginx" : "standalone",
         output: (issueResult.stdout || "")?.slice(0, 8000),
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     return res.json({
@@ -3227,7 +3227,7 @@ router.post("/step/certbot-issue", async (req: Request, res: Response) => {
           JSON.stringify({
             error: error?.message || error,
             when: "certbot-issue",
-          })
+          }),
         );
       }
     } catch (_) {}
@@ -3292,7 +3292,7 @@ router.post(
         cmd: string,
         label: string,
         timeoutMs: number = 60000,
-        allowNonZero: boolean = false
+        allowNonZero: boolean = false,
       ): Promise<{ code: number; stdout: string; stderr: string }> => {
         return new Promise((resolve, reject) => {
           let stdout = "";
@@ -3320,8 +3320,8 @@ router.post(
                   new Error(
                     `${label} exited with ${code}${
                       stderr ? `: ${stderr.trim()}` : ""
-                    }`
-                  )
+                    }`,
+                  ),
                 );
               }
               resolve({ code, stdout, stderr });
@@ -3356,7 +3356,7 @@ router.post(
           "(. /etc/os-release; echo $ID) 2>/dev/null || echo unknown",
           "detect os",
           8000,
-          true
+          true,
         );
         const id = (r.stdout || "").trim().toLowerCase();
         if (["ubuntu", "debian"].includes(id)) pkgMgr = "apt";
@@ -3373,16 +3373,16 @@ router.post(
       if (pkgMgr === "apt") {
         installCmds.push(
           "DEBIAN_FRONTEND=noninteractive sudo -n apt-get update -yq",
-          "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq nginx certbot python3-certbot-nginx"
+          "DEBIAN_FRONTEND=noninteractive sudo -n apt-get install -yq nginx certbot python3-certbot-nginx",
         );
       } else if (pkgMgr === "dnf") {
         installCmds.push(
-          "sudo -n dnf -y -q install nginx certbot python3-certbot-nginx || sudo -n yum -y -q install nginx certbot python3-certbot-nginx"
+          "sudo -n dnf -y -q install nginx certbot python3-certbot-nginx || sudo -n yum -y -q install nginx certbot python3-certbot-nginx",
         );
       } else if (pkgMgr === "apk") {
         installCmds.push(
           "sudo -n apk update -q",
-          "sudo -n apk add -q nginx certbot certbot-nginx"
+          "sudo -n apk add -q nginx certbot certbot-nginx",
         );
       }
       for (const cmd of installCmds) {
@@ -3396,7 +3396,7 @@ router.post(
         `sudo -n mkdir -p ${rootDir}`,
         "create root dir",
         10000,
-        false
+        false,
       );
 
       // Load minimal nginx config from template
@@ -3410,7 +3410,7 @@ router.post(
         `cat <<'${heredoc}' | sudo -n tee /etc/nginx/sites-available/${domain}.conf > /dev/null\n${minimalNginxConf}\n${heredoc}`,
         "write minimal config",
         15000,
-        false
+        false,
       );
 
       // Enable site
@@ -3418,7 +3418,7 @@ router.post(
         `sudo -n ln -sf /etc/nginx/sites-available/${domain}.conf /etc/nginx/sites-enabled/${domain}.conf`,
         "enable site",
         10000,
-        true
+        true,
       );
 
       // Test nginx config
@@ -3429,7 +3429,7 @@ router.post(
         "sudo -n systemctl enable --now nginx || sudo -n service nginx start",
         "start nginx",
         20000,
-        true
+        true,
       );
 
       // Step 3: Prepare SSL/TLS infrastructure for certbot
@@ -3440,7 +3440,7 @@ router.post(
         "sudo -n openssl dhparam -out /etc/nginx/dhparam.pem 2048",
         "generate dhparam",
         120000,
-        false
+        false,
       );
 
       // Create and configure Let's Encrypt directory
@@ -3448,7 +3448,7 @@ router.post(
         "sudo -n mkdir -p /var/www/_letsencrypt",
         "create letsencrypt dir",
         10000,
-        false
+        false,
       );
 
       // Set ownership to www-data for ACME challenges
@@ -3456,7 +3456,7 @@ router.post(
         "sudo -n chown www-data /var/www/_letsencrypt",
         "set letsencrypt ownership",
         10000,
-        false
+        false,
       );
 
       // Step 4: Provision HTTPS certificate using certbot nginx plugin
@@ -3476,7 +3476,7 @@ router.post(
         certbotCmd,
         "certbot issue",
         300000,
-        true
+        true,
       );
 
       // Enable auto-renewal
@@ -3484,7 +3484,7 @@ router.post(
         "sudo -n systemctl enable --now certbot.timer || true",
         "enable renewal timer",
         15000,
-        true
+        true,
       );
 
       ssh.end();
@@ -3500,7 +3500,7 @@ router.post(
           certificateMethod: "nginx",
           output: (certResult.stdout || "")?.slice(0, 8000),
           duration: Date.now() - startTime,
-        })
+        }),
       );
 
       return res.json({
@@ -3531,7 +3531,7 @@ router.post(
             JSON.stringify({
               error: error?.message || error,
               duration: Date.now() - startTime,
-            })
+            }),
           );
         }
       } catch (_) {}
@@ -3540,7 +3540,7 @@ router.post(
         .status(500)
         .json({ success: false, error: error?.message || String(error) });
     }
-  }
+  },
 );
 
 /**
@@ -3613,7 +3613,7 @@ router.post(
         cmd: string,
         label: string,
         timeoutMs: number = 60000,
-        allowNonZero: boolean = false
+        allowNonZero: boolean = false,
       ): Promise<{ code: number; stdout: string; stderr: string }> => {
         return new Promise((resolve, reject) => {
           let stdout = "";
@@ -3623,7 +3623,7 @@ router.post(
             if (finished) return;
             finished = true;
             logger.error(
-              `[LaravelStack] Timeout (${timeoutMs}ms) running ${label}`
+              `[LaravelStack] Timeout (${timeoutMs}ms) running ${label}`,
             );
             reject(new Error(`Timeout running ${label}`));
           }, timeoutMs);
@@ -3641,11 +3641,11 @@ router.post(
               clearTimeout(timer);
               if (stdout.trim())
                 logger.debug(
-                  `[LaravelStack] ${label} stdout: ${stdout.trim()}`
+                  `[LaravelStack] ${label} stdout: ${stdout.trim()}`,
                 );
               if (stderr.trim())
                 logger.debug(
-                  `[LaravelStack] ${label} stderr: ${stderr.trim()}`
+                  `[LaravelStack] ${label} stderr: ${stderr.trim()}`,
                 );
               if (!allowNonZero && code !== 0) {
                 const errMsg = `${label} exited with ${code}${
@@ -3672,7 +3672,7 @@ router.post(
       } catch (e: any) {
         ssh.end();
         logger.error(
-          `[LaravelStack] sudo -n not permitted: ${e?.message || e}`
+          `[LaravelStack] sudo -n not permitted: ${e?.message || e}`,
         );
         return res.status(400).json({
           success: false,
@@ -3685,7 +3685,7 @@ router.post(
       // Load installation script template
       const templatePath = join(
         __dirname,
-        "../../../templates/install-laravel-stack.sh.template"
+        "../../../templates/install-laravel-stack.sh.template",
       );
       let installScript = await readFile(templatePath, "utf-8");
 
@@ -3711,14 +3711,14 @@ router.post(
         `cat <<'${heredoc}' > ${scriptPath}\n${installScript}\n${heredoc}`,
         "upload script",
         30000,
-        false
+        false,
       );
 
       await execWithTimeout(
         `chmod +x ${scriptPath}`,
         "make executable",
         10000,
-        false
+        false,
       );
 
       // Execute installation script
@@ -3727,7 +3727,7 @@ router.post(
         `bash ${scriptPath}`,
         "install stack",
         600000, // 10 minutes timeout
-        true
+        true,
       );
 
       // Clean up script
@@ -3735,7 +3735,7 @@ router.post(
         `rm -f ${scriptPath}`,
         "cleanup script",
         10000,
-        true
+        true,
       );
 
       // Verify installations
@@ -3747,7 +3747,7 @@ router.post(
           "nginx -v 2>&1",
           "check nginx",
           10000,
-          true
+          true,
         );
         verifications.nginx = nginxVersion.stdout || nginxVersion.stderr;
       } catch (e: any) {
@@ -3759,7 +3759,7 @@ router.post(
           "php -v",
           "check php",
           10000,
-          true
+          true,
         );
         verifications.php = phpVersionCheck.stdout.split("\n")[0];
       } catch (e: any) {
@@ -3771,7 +3771,7 @@ router.post(
           "composer --version",
           "check composer",
           10000,
-          true
+          true,
         );
         verifications.composer = composerVersionCheck.stdout.split("\n")[0];
       } catch (e: any) {
@@ -3783,7 +3783,7 @@ router.post(
           ". ~/.nvm/nvm.sh && node --version",
           "check node",
           10000,
-          true
+          true,
         );
         verifications.node = nodeVersionCheck.stdout.trim();
       } catch (e: any) {
@@ -3800,7 +3800,7 @@ router.post(
         username,
         applicationName,
         phpVersion,
-        dbType
+        dbType,
       );
 
       // Log success
@@ -3815,7 +3815,7 @@ router.post(
           verifications,
           installOutput: installResult.stdout.slice(-5000),
           duration: Date.now() - startTime,
-        })
+        }),
       );
 
       logger.info("[LaravelStack] Installation completed successfully");
@@ -3841,14 +3841,14 @@ router.post(
       });
     } catch (error: any) {
       logger.error(
-        `[LaravelStack] Installation failed: ${error?.message || error}`
+        `[LaravelStack] Installation failed: ${error?.message || error}`,
       );
 
       try {
         const app = await getApplicationByName(
           req.body.host,
           req.body.username,
-          req.body.applicationName
+          req.body.applicationName,
         );
         if (app) {
           await addApplicationStep(
@@ -3858,7 +3858,7 @@ router.post(
             JSON.stringify({
               error: error?.message || error,
               duration: Date.now() - startTime,
-            })
+            }),
           );
         }
       } catch (_) {}
@@ -3868,7 +3868,7 @@ router.post(
         error: error?.message || String(error),
       });
     }
-  }
+  },
 );
 
 /**
@@ -3929,7 +3929,7 @@ router.post("/step/node-nvm-setup", async (req: Request, res: Response) => {
       cmd: string,
       label: string,
       timeoutMs: number = 120000,
-      allowNonZero: boolean = false
+      allowNonZero: boolean = false,
     ): Promise<{ code: number; stdout: string; stderr: string }> => {
       return new Promise((resolve, reject) => {
         let stdout = "";
@@ -3957,8 +3957,8 @@ router.post("/step/node-nvm-setup", async (req: Request, res: Response) => {
                 new Error(
                   `${label} exited with ${code}${
                     stderr ? `: ${stderr.trim()}` : ""
-                  }`
-                )
+                  }`,
+                ),
               );
             }
             resolve({ code, stdout, stderr });
@@ -3994,7 +3994,7 @@ router.post("/step/node-nvm-setup", async (req: Request, res: Response) => {
         `. ~/.nvm/nvm.sh && node --version`,
         "check node version",
         10000,
-        true
+        true,
       );
       nodeVersionOutput = nodeVer.stdout.trim();
     } catch (_) {
@@ -4006,7 +4006,7 @@ router.post("/step/node-nvm-setup", async (req: Request, res: Response) => {
         `. ~/.nvm/nvm.sh && npm --version`,
         "check npm version",
         10000,
-        true
+        true,
       );
       npmVersionOutput = npmVer.stdout.trim();
     } catch (_) {
@@ -4018,7 +4018,7 @@ router.post("/step/node-nvm-setup", async (req: Request, res: Response) => {
         `. ~/.nvm/nvm.sh && nvm --version`,
         "check nvm version",
         10000,
-        true
+        true,
       );
       nvmVersionOutput = nvmVer.stdout.trim();
     } catch (_) {
@@ -4041,7 +4041,7 @@ router.post("/step/node-nvm-setup", async (req: Request, res: Response) => {
           npm: npmVersionOutput,
         },
         duration: Date.now() - startTime,
-      })
+      }),
     );
 
     logger.info("[NodeNVM] Installation completed successfully");
@@ -4075,7 +4075,7 @@ router.post("/step/node-nvm-setup", async (req: Request, res: Response) => {
           JSON.stringify({
             error: error?.message || error,
             duration: Date.now() - startTime,
-          })
+          }),
         );
       }
     } catch (_) {}
@@ -4129,7 +4129,7 @@ router.get(
         error: error.message,
       });
     }
-  }
+  },
 );
 
 /**
@@ -4207,7 +4207,7 @@ router.post(
         [owner, repoName] = selectedRepo.split("/");
       } else {
         const m = selectedRepo.match(
-          /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/
+          /^https?:\/\/github\.com\/([^\/]+)\/([^\/#?]+)(?:[\/#?].*)?$/,
         );
         if (!m) {
           return res.status(400).json({
@@ -4237,30 +4237,30 @@ router.post(
       try {
         const refResp = await gh.get(
           `/repos/${owner}/${repoName}/git/refs/heads/${encodeURIComponent(
-            baseBranch
-          )}`
+            baseBranch,
+          )}`,
         );
         baseSha = refResp.data?.object?.sha || refResp.data?.sha;
         logger.info(
-          `[DeployWorkflow] Found base branch '${baseBranch}' and SHA ${baseSha}`
+          `[DeployWorkflow] Found base branch '${baseBranch}' and SHA ${baseSha}`,
         );
       } catch (e: any) {
         // If the specified branch doesn't exist, create it from 'dev'
         if (e?.response?.status === 404) {
           logger.info(
-            `[DeployWorkflow] Branch '${baseBranch}' not found, attempting to create from 'dev'`
+            `[DeployWorkflow] Branch '${baseBranch}' not found, attempting to create from 'dev'`,
           );
           try {
             // Get 'dev' branch ref
             const devRefResp = await gh.get(
-              `/repos/${owner}/${repoName}/git/refs/heads/dev`
+              `/repos/${owner}/${repoName}/git/refs/heads/dev`,
             );
             const devSha = devRefResp.data?.object?.sha || devRefResp.data?.sha;
 
             if (devSha) {
               // Create the requested branch from 'dev'
               logger.info(
-                `[DeployWorkflow] Creating branch '${baseBranch}' from 'dev'`
+                `[DeployWorkflow] Creating branch '${baseBranch}' from 'dev'`,
               );
               await gh.post(`/repos/${owner}/${repoName}/git/refs`, {
                 ref: `refs/heads/${baseBranch}`,
@@ -4270,12 +4270,12 @@ router.post(
               actualBaseBranch = baseBranch;
               branchCreated = true;
               logger.info(
-                `[DeployWorkflow] Successfully created branch '${baseBranch}' from 'dev'`
+                `[DeployWorkflow] Successfully created branch '${baseBranch}' from 'dev'`,
               );
             }
           } catch (devBranchError: any) {
             logger.error(
-              `[DeployWorkflow] Failed to create branch from 'dev': ${devBranchError.message}`
+              `[DeployWorkflow] Failed to create branch from 'dev': ${devBranchError.message}`,
             );
             // If 'dev' doesn't exist either, return error
             return res.status(404).json({
@@ -4296,14 +4296,14 @@ router.post(
       // 2) Create a feature branch
       const featureBranch = `deploy-update-${applicationName.replace(
         /\W+/g,
-        "-"
+        "-",
       )}-${Date.now()}`;
       await gh.post(`/repos/${owner}/${repoName}/git/refs`, {
         ref: `refs/heads/${featureBranch}`,
         sha: baseSha,
       });
       logger.info(
-        `[DeployWorkflow] Created feature branch '${featureBranch}' from '${actualBaseBranch}'`
+        `[DeployWorkflow] Created feature branch '${featureBranch}' from '${actualBaseBranch}'`,
       );
 
       // 3) Find deploy.yml (common locations) or create default if not found
@@ -4316,20 +4316,20 @@ router.post(
         try {
           const c = await gh.get(
             `/repos/${owner}/${repoName}/contents/${encodeURI(
-              p
-            )}?ref=${featureBranch}`
+              p,
+            )}?ref=${featureBranch}`,
           );
           const data = c.data;
           if (data && data.content) {
             const decoded = Buffer.from(
               data.content,
-              data.encoding || "base64"
+              data.encoding || "base64",
             ).toString("utf-8");
             deployPath = p;
             fileSha = data.sha;
             fileContent = decoded;
             logger.info(
-              `[DeployWorkflow] Found existing deploy file at ${deployPath}`
+              `[DeployWorkflow] Found existing deploy file at ${deployPath}`,
             );
             break;
           }
@@ -4340,7 +4340,7 @@ router.post(
       let putResp: any = null;
       if (deployPath && fileContent && fileSha) {
         logger.info(
-          `[DeployWorkflow] Found deploy file at ${deployPath}, updating...`
+          `[DeployWorkflow] Found deploy file at ${deployPath}, updating...`,
         );
 
         // 4) Update YAML: ensure hosts/application entry exists and update fields
@@ -4401,12 +4401,12 @@ router.post(
 
         putResp = await gh.put(
           `/repos/${owner}/${repoName}/contents/${encodeURI(deployPath)}`,
-          putPayload
+          putPayload,
         );
         logger.info(`[DeployWorkflow] Updated ${deployPath} on feature branch`);
       } else {
         logger.info(
-          `[DeployWorkflow] deploy.yml not found, skipping deploy.yml update`
+          `[DeployWorkflow] deploy.yml not found, skipping deploy.yml update`,
         );
       }
 
@@ -4417,7 +4417,7 @@ router.post(
           .replace(/[^A-Za-z0-9]/g, "_")
           .toUpperCase()}`;
 
-      const workflowPath = `.github/workflows/laravel-project-deployment.yml`;
+      const workflowPath = `.github/workflows/deploy-${applicationName}.yml`;
       const workflowContent = `name: Deploy ${applicationName}
 run-name: Deploy to production for \${{ github.ref }} by @\${{ github.actor }} (\${{ github.sha }})
 
@@ -4442,11 +4442,11 @@ jobs:
       let workflowFileSha: string | undefined;
       try {
         const existingFile = await gh.get(
-          `/repos/${owner}/${repoName}/contents/${workflowPath}?ref=${featureBranch}`
+          `/repos/${owner}/${repoName}/contents/${workflowPath}?ref=${featureBranch}`,
         );
         workflowFileSha = existingFile.data.sha;
         logger.info(
-          `[DeployWorkflow] Found existing workflow file, will update`
+          `[DeployWorkflow] Found existing workflow file, will update`,
         );
       } catch (err: any) {
         if (err.response?.status === 404) {
@@ -4469,7 +4469,7 @@ jobs:
 
       const workflowResp = await gh.put(
         `/repos/${owner}/${repoName}/contents/${workflowPath}`,
-        workflowPayload
+        workflowPayload,
       );
       logger.info(`[DeployWorkflow] Workflow file committed`);
 
@@ -4524,7 +4524,7 @@ Ensure the following secrets and variables are set in your repository:
           prNumber: prResp.data?.number,
           prUrl: prResp.data?.html_url,
           duration: Date.now() - startTime,
-        })
+        }),
       );
 
       return res.json({
@@ -4569,14 +4569,17 @@ Ensure the following secrets and variables are set in your repository:
             app.id,
             "deploy-workflow-update",
             "failed",
-            JSON.stringify({ error: details, duration: Date.now() - startTime })
+            JSON.stringify({
+              error: details,
+              duration: Date.now() - startTime,
+            }),
           );
         }
       } catch (_) {}
 
       return res.status(500).json({ success: false, error: details });
     }
-  }
+  },
 );
 
 /**
@@ -4589,7 +4592,7 @@ router.get("/applications", async (req: Request, res: Response) => {
     const db =
       require("../shared/database").getDb?.() ||
       require("knex")(
-        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"],
       );
 
     const applications = await db("applications")
@@ -4627,7 +4630,7 @@ router.get("/applications", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error(
-      `[Applications] Failed to list applications: ${error.message}`
+      `[Applications] Failed to list applications: ${error.message}`,
     );
     res.status(500).json({
       success: false,
@@ -4730,7 +4733,7 @@ router.post("/applications", async (req: Request, res: Response) => {
     });
 
     logger.info(
-      `[Applications] Created new application: ${applicationName} (ID: ${result.id})`
+      `[Applications] Created new application: ${applicationName} (ID: ${result.id})`,
     );
 
     res.json({
@@ -4747,7 +4750,7 @@ router.post("/applications", async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error(
-      `[Applications] Failed to create application: ${error.message}`
+      `[Applications] Failed to create application: ${error.message}`,
     );
     res.status(500).json({
       success: false,
@@ -4775,7 +4778,7 @@ router.get("/applications/:id", async (req: Request, res: Response) => {
     const db =
       require("../shared/database").getDb?.() ||
       require("knex")(
-        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+        require("../../knexfile.cjs")[process.env.NODE_ENV || "development"],
       );
 
     const application = await db("applications")
@@ -4790,7 +4793,7 @@ router.get("/applications/:id", async (req: Request, res: Response) => {
     }
 
     logger.info(
-      `[Applications] Retrieved application: ${application.applicationName}`
+      `[Applications] Retrieved application: ${application.applicationName}`,
     );
 
     res.json({
@@ -4849,7 +4852,7 @@ router.post(
       const db =
         require("../shared/database").getDb?.() ||
         require("knex")(
-          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"],
         );
 
       const existing = await db("applications")
@@ -4870,11 +4873,11 @@ router.post(
         Number(id),
         "repo-selection",
         "success",
-        JSON.stringify({ selectedRepo })
+        JSON.stringify({ selectedRepo }),
       );
 
       logger.info(
-        `[Applications] Selected repo updated for app ${id}: ${selectedRepo}`
+        `[Applications] Selected repo updated for app ${id}: ${selectedRepo}`,
       );
       return res.json({
         success: true,
@@ -4883,11 +4886,11 @@ router.post(
       });
     } catch (error: any) {
       logger.error(
-        `[Applications] Failed to save selected repo: ${error.message}`
+        `[Applications] Failed to save selected repo: ${error.message}`,
       );
       return res.status(500).json({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 /**
@@ -4917,7 +4920,7 @@ router.post(
       const db =
         require("../shared/database").getDb?.() ||
         require("knex")(
-          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"],
         );
 
       const application = await db("applications")
@@ -4952,11 +4955,11 @@ router.post(
         Number(id),
         "database-config-save",
         "success",
-        JSON.stringify({ dbType, dbName })
+        JSON.stringify({ dbType, dbName }),
       );
 
       logger.info(
-        `[Applications] Database config saved for app ${id}: ${dbType}/${dbName}`
+        `[Applications] Database config saved for app ${id}: ${dbType}/${dbName}`,
       );
       return res.json({
         success: true,
@@ -4965,11 +4968,11 @@ router.post(
       });
     } catch (error: any) {
       logger.error(
-        `[Applications] Failed to save database config: ${error.message}`
+        `[Applications] Failed to save database config: ${error.message}`,
       );
       return res.status(500).json({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 /**
@@ -4992,7 +4995,7 @@ router.get(
       const db =
         require("../shared/database").getDb?.() ||
         require("knex")(
-          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"]
+          require("../../knexfile.cjs")[process.env.NODE_ENV || "development"],
         );
 
       const application = await db("applications")
@@ -5027,11 +5030,11 @@ router.get(
       });
     } catch (error: any) {
       logger.error(
-        `[Applications] Failed to get database config: ${error.message}`
+        `[Applications] Failed to get database config: ${error.message}`,
       );
       return res.status(500).json({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 export default router;
